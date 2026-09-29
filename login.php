@@ -89,6 +89,18 @@ if ($dbError !== null) {
     exit;
 }
 
+// Nếu kết nối CSDL thành công nhưng chưa có bảng `users`, tự động chuyển hướng tới trang cài đặt
+try {
+    $pdo = \SimpleFinance\Database::getConnection();
+    $stmt = $pdo->query("SHOW TABLES LIKE 'users'");
+    if (!$stmt->fetch()) {
+        header('Location: install.php');
+        exit;
+    }
+} catch (\Throwable $e) {
+    // bỏ qua lỗi nếu không hỗ trợ SHOW TABLES
+}
+
 $errorMessage = '';
 
 // Xử lý nút "Đổi tài khoản khác"

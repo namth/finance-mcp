@@ -245,6 +245,56 @@ if ($action === 'status') {
     exit;
 }
 
+// Xử lý Hành động MCP_INFO (Lấy thông tin MCP Endpoint cho Admin)
+if ($action === 'mcp_info') {
+    flock($lockFp, LOCK_UN);
+    fclose($lockFp);
+    @unlink($lockFile);
+
+    header('Content-Type: application/json; charset=utf-8');
+    try {
+        $dbConfig = $config['db'] ?? [];
+        $dsn = sprintf(
+            "mysql:host=%s;port=%d;dbname=%s;charset=%s",
+            $dbConfig['host'] ?? '127.0.0.1',
+            $dbConfig['port'] ?? 3306,
+            $dbConfig['dbname'] ?? 'simplefinance',
+            $dbConfig['charset'] ?? 'utf8mb4'
+        );
+        $pdo = new PDO($dsn, $dbConfig['username'] ?? 'root', $dbConfig['password'] ?? '', [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+        ]);
+        $stmt = $pdo->query("SELECT id, username, full_name, email, api_key FROM `users` ORDER BY id ASC LIMIT 1");
+        $u = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($u) {
+            $host = $_SERVER['HTTP_HOST'] ?? 'financemcp.oa.io.vn';
+            echo json_encode([
+                'success' => true,
+                'user'    => [
+                    'id'        => (int)$u['id'],
+                    'username'  => $u['username'],
+                    'full_name' => $u['full_name'],
+                    'email'     => $u['email'],
+                    'api_key'   => $u['api_key'],
+                ],
+                'mcp_url' => "https://{$host}/mcp.php?key=" . $u['api_key'],
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        } else {
+            echo json_encode([
+                'success' => false,
+                'message' => 'Chưa có tài khoản nào trong CSDL. Hãy truy cập /install.php để khởi tạo.',
+            ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
+    } catch (\Throwable $e) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Lỗi kết nối CSDL: ' . $e->getMessage(),
+        ], JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    }
+    exit;
+}
+
 // Xử lý Hành động PULL (Triển khai code mới)
 // 1. git fetch origin <branch>
 // 2. git reset --hard origin/<branch> (đảm bảo code sạch sẽ, không bị xung đột với các file sinh cục bộ)

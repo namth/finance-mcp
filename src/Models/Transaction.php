@@ -251,11 +251,13 @@ class Transaction
             return null;
         }
 
-        // Lấy danh sách items
+        // Lấy danh sách items kèm thông tin Quán / Địa điểm nếu có
         $stmtItems = $this->db->prepare("
-            SELECT ti.*, p.name AS product_name, p.description AS product_description
+            SELECT ti.*, p.name AS product_name, p.description AS product_description,
+                   pl.name AS place_name, pl.address AS place_address
             FROM `transaction_items` ti
             JOIN `products` p ON ti.product_id = p.id
+            LEFT JOIN `places` pl ON p.place_id = pl.id
             WHERE ti.transaction_id = :transaction_id
             ORDER BY ti.id ASC
         ");

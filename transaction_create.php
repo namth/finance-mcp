@@ -201,8 +201,9 @@ function addItemRow() {
 
     let productOptions = `<option value="">-- Chọn sản phẩm/dịch vụ --</option>`;
     availableProducts.forEach(p => {
+        const placeLabel = p.place_name ? ` — 📍 ${p.place_name}${p.place_address ? ' (' + p.place_address + ')' : ''}` : '';
         const priceLabel = p.default_price !== null ? `(${Number(p.default_price).toLocaleString()} đ)` : `(Giá tùy nhập)`;
-        productOptions += `<option value="${p.id}" data-price="${p.default_price !== null ? p.default_price : ''}">${p.name} ${priceLabel}</option>`;
+        productOptions += `<option value="${p.id}" data-price="${p.default_price !== null ? p.default_price : ''}" data-place="${p.place_name || ''}" data-address="${p.place_address || ''}">${p.name}${placeLabel} ${priceLabel}</option>`;
     });
 
     let memberCheckboxes = '';
@@ -229,6 +230,13 @@ function addItemRow() {
                 <select name="items[${idx}][product_id]" required onchange="onProductSelect(${idx}, this)" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:border-emerald-500 text-sm font-medium">
                     ${productOptions}
                 </select>
+                <div id="itemPlaceBadge_${idx}" class="hidden mt-1 text-[11px] text-emerald-700 font-medium flex items-center">
+                    <svg class="w-3 h-3 mr-1 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span id="itemPlaceText_${idx}"></span>
+                </div>
             </div>
 
             <div class="sm:col-span-4">
@@ -270,12 +278,24 @@ function removeItemRow(idx) {
 function onProductSelect(idx, selectElem) {
     const selectedOption = selectElem.options[selectElem.selectedIndex];
     const defaultPrice = selectedOption.getAttribute('data-price');
+    const placeName = selectedOption.getAttribute('data-place');
+    const placeAddress = selectedOption.getAttribute('data-address');
+
     const priceInput = document.getElementById(`price_${idx}`);
     if (defaultPrice) {
         priceInput.value = defaultPrice;
     } else {
         priceInput.value = '';
         priceInput.placeholder = 'Nhập giá cho lần dùng này';
+    }
+
+    const badge = document.getElementById(`itemPlaceBadge_${idx}`);
+    const badgeText = document.getElementById(`itemPlaceText_${idx}`);
+    if (placeName) {
+        badgeText.textContent = placeName + (placeAddress ? ` (${placeAddress})` : '');
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
     }
 }
 

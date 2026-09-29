@@ -133,7 +133,19 @@ require_once __DIR__ . '/includes/header.php';
                             </span>
                             <div>
                                 <h3 class="text-base font-bold text-slate-900"><?= htmlspecialchars($item['product_name']) ?></h3>
-                                <p class="text-xs text-slate-500">
+                                <?php if (!empty($item['place_name'])): ?>
+                                    <div class="flex items-center text-xs text-emerald-700 font-medium mt-0.5">
+                                        <svg class="w-3.5 h-3.5 mr-1 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                        </svg>
+                                        <span><?= htmlspecialchars($item['place_name']) ?></span>
+                                        <?php if (!empty($item['place_address'])): ?>
+                                            <span class="text-slate-400 text-[11px] ml-1.5 font-normal">(<?= htmlspecialchars($item['place_address']) ?>)</span>
+                                        <?php endif; ?>
+                                    </div>
+                                <?php endif; ?>
+                                <p class="text-xs text-slate-500 mt-0.5">
                                     Đơn giá: <span class="font-semibold text-slate-700"><?= number_format($item['price']) ?> đ</span> &times; Số lượng: <span class="font-semibold text-slate-700"><?= $item['quantity'] ?></span>
                                 </p>
                             </div>

@@ -110,3 +110,31 @@ SET @preparedStatement = (SELECT IF(
 PREPARE alterIfNotExists FROM @preparedStatement;
 EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
+
+-- Bảng places và cột place_id trong products
+CREATE TABLE IF NOT EXISTS `places` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `group_id` INT UNSIGNED NOT NULL DEFAULT 1,
+    `name` VARCHAR(150) NOT NULL,
+    `address` VARCHAR(255) DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    INDEX (`group_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+SET @tablename = "products";
+SET @columnname = "place_id";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `products` ADD COLUMN `place_id` INT UNSIGNED DEFAULT NULL AFTER `group_id`;"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+

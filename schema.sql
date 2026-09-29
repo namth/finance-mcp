@@ -9,12 +9,21 @@ CREATE TABLE IF NOT EXISTS `members` (
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `places` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `name` VARCHAR(150) NOT NULL,
+    `address` VARCHAR(255) DEFAULT NULL,
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `products` (
     `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `place_id` INT UNSIGNED DEFAULT NULL COMMENT 'Quán/địa điểm có món này',
     `name` VARCHAR(150) NOT NULL,
     `default_price` DECIMAL(15, 2) DEFAULT NULL COMMENT 'Giá mặc định nếu có, để NULL nếu giá thay đổi tùy lần dùng',
     `description` TEXT DEFAULT NULL,
-    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+    `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (`place_id`) REFERENCES `places`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `transactions` (

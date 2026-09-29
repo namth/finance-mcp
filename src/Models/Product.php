@@ -13,10 +13,17 @@ class Product
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::getConnection();
+        // Đảm bảo schema của places và cột place_id đã sẵn sàng
+        (new Place($this->db))->ensureSchema();
     }
 
-    public function create(string $name, ?float $defaultPrice = null, ?string $description = null, int $groupId = 1): array
-    {
+    public function create(
+        string $name,
+        ?float $defaultPrice = null,
+        ?string $description = null,
+        int $groupId = 1,
+        ?int $placeId = null
+    ): array {
         $name = trim($name);
         if (empty($name)) {
             throw new InvalidArgumentException("Tên sản phẩm/dịch vụ không được để trống.");
@@ -26,9 +33,15 @@ class Product
             throw new InvalidArgumentException("Giá sản phẩm không được là số âm.");
         }
 
-        $stmt = $this->db->prepare("INSERT INTO `products` (`group_id`, `name`, `default_price`, `description`) VALUES (:group_id, :name, :default_price, :description)");
+        $placeId = ($placeId !== null && $placeId > 0) ? $placeId : null;
+
+        $stmt = $this->db->prepare("
+            INSERT INTO `products` (`group_id`, `place_id`, `name`, `default_price`, `description`)
+            VALUES (:group_id, :place_id, :name, :default_price, :description)
+        ");
         $stmt->execute([
             ':group_id'      => $groupId,
+            ':place_id'      => $placeId,
             ':name'          => $name,
             ':default_price' => $defaultPrice !== null ? round($defaultPrice, 2) : null,
             ':description'   => $description ? trim($description) : null,
@@ -40,18 +53,31 @@ class Product
 
     public function all(?int $groupId = null): array
     {
+        $sql = "
+            SELECT p.*, pl.name AS place_name, pl.address AS place_address
+            FROM `products` p
+            LEFT JOIN `places` pl ON p.place_id = pl.id
+        ";
         if ($groupId !== null) {
-            $stmt = $this->db->prepare("SELECT * FROM `products` WHERE `group_id` = :gid ORDER BY `id` ASC");
+            $sql .= " WHERE p.group_id = :gid ORDER BY p.id ASC";
+            $stmt = $this->db->prepare($sql);
             $stmt->execute([':gid' => $groupId]);
             return $stmt->fetchAll();
         }
-        $stmt = $this->db->query("SELECT * FROM `products` ORDER BY `id` ASC");
+
+        $sql .= " ORDER BY p.id ASC";
+        $stmt = $this->db->query($sql);
         return $stmt->fetchAll();
     }
 
     public function find(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT * FROM `products` WHERE `id` = :id");
+        $stmt = $this->db->prepare("
+            SELECT p.*, pl.name AS place_name, pl.address AS place_address
+            FROM `products` p
+            LEFT JOIN `places` pl ON p.place_id = pl.id
+            WHERE p.id = :id
+        ");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -74,6 +100,12 @@ class Product
             }
             $fields[] = "`name` = :name";
             $params[':name'] = $name;
+        }
+
+        if (array_key_exists('place_id', $data)) {
+            $placeId = $data['place_id'];
+            $fields[] = "`place_id` = :place_id";
+            $params[':place_id'] = ($placeId !== null && (int)$placeId > 0) ? (int)$placeId : null;
         }
 
         if (array_key_exists('default_price', $data)) {

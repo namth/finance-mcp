@@ -1,0 +1,385 @@
+<?php
+
+require_once __DIR__ . '/auth_check.php';
+
+spl_autoload_register(function ($class) {
+    $prefix = 'SimpleFinance\\';
+    $baseDir = __DIR__ . '/src/';
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) return;
+    $relativeClass = substr($class, $len);
+    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    if (file_exists($file)) require $file;
+});
+
+use SimpleFinance\Database;
+use SimpleFinance\Models\Member;
+use SimpleFinance\Models\Product;
+use SimpleFinance\Models\Transaction;
+use SimpleFinance\DebtManager;
+
+$dbError = null;
+$members = [];
+$products = [];
+$transactions = [];
+$debts = [];
+$totalSpent = 0;
+$flashSuccess = '';
+$flashError = '';
+
+$currentGroupId = (int)($_SESSION['current_group_id'] ?? 1);
+
+try {
+    $memberModel = new Member();
+    $productModel = new Product();
+    $txModel = new Transaction();
+    $debtManager = new DebtManager();
+
+    // Xử lý action Gạch nợ (Settle Debt)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'settle') {
+        $debtorId = (int)($_POST['debtor_id'] ?? 0);
+        $creditorId = (int)($_POST['creditor_id'] ?? 0);
+        $amount = (float)($_POST['amount'] ?? 0);
+        $note = trim((string)($_POST['note'] ?? ''));
+
+        if ($debtorId > 0 && $creditorId > 0 && $amount > 0) {
+            $settleRes = $debtManager->settle($debtorId, $creditorId, $amount, $note, $currentGroupId);
+            $flashSuccess = "Đã gạch nợ thành công số tiền " . number_format($amount) . " đ!";
+        } else {
+            $flashError = "Vui lòng nhập số tiền hợp lệ (> 0).";
+        }
+    }
+
+    $members = $memberModel->all();
+    $products = $productModel->all($currentGroupId);
+    $transactions = $txModel->all(null, 5, 0, $currentGroupId); // 5 gần nhất của nhóm
+    $debts = $debtManager->getSummary(null, $currentGroupId);
+
+    foreach ($txModel->all('completed', 1000, 0, $currentGroupId) as $t) {
+        $totalSpent += (float)$t['total_amount'];
+    }
+} catch (\Throwable $e) {
+    $dbError = $e->getMessage();
+}
+
+$pageTitle = "Bảng Điều Khiển - SimpleFinance";
+require_once __DIR__ . '/includes/header.php';
+?>
+
+<?php if ($dbError): ?>
+    <div class="mb-8 p-6 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 shadow-sm">
+        <div class="flex items-start space-x-3">
+            <svg class="h-6 w-6 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+                <h3 class="text-base font-bold text-amber-900">Chưa kết nối được với Cơ sở Dữ liệu MySQL</h3>
+                <p class="mt-1 text-sm text-amber-800 leading-relaxed">
+                    Hệ thống chưa thể đọc dữ liệu: <code class="bg-amber-100 px-2 py-0.5 rounded font-mono text-xs"><?= htmlspecialchars($dbError) ?></code>
+                </p>
+                <div class="mt-4 flex flex-wrap gap-3 text-xs">
+                    <a href="config.php" class="inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 transition">
+                        Kiểm tra config.php
+                    </a>
+                    <span class="text-amber-700 self-center">Hãy đảm bảo bạn đã tạo Database và chạy lệnh import từ file <code class="font-mono font-bold">schema.sql</code></span>
+                </div>
+            </div>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if ($flashSuccess): ?>
+    <div class="mb-6 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <svg class="w-5 h-5 text-emerald-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+            </svg>
+            <span class="font-medium"><?= htmlspecialchars($flashSuccess) ?></span>
+        </div>
+    </div>
+<?php endif; ?>
+
+<?php if ($flashError): ?>
+    <div class="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center space-x-2">
+        <svg class="w-5 h-5 text-rose-600" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+        </svg>
+        <span><?= htmlspecialchars($flashError) ?></span>
+    </div>
+<?php endif; ?>
+
+<!-- 4 Thẻ Thống Kê Tổng Quan -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+    <!-- Thẻ 1: Tổng chi tiêu -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng Đã Chi Tiêu</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900"><?= number_format($totalSpent) ?> <span class="text-sm font-normal text-slate-500">đ</span></p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Thẻ 2: Thành viên -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Thành Viên Nhóm</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900"><?= count($members) ?> <span class="text-sm font-normal text-slate-500">người</span></p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Thẻ 3: Sản phẩm dịch vụ -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Sản Phẩm & Dịch Vụ</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900"><?= count($products) ?> <span class="text-sm font-normal text-slate-500">mục</span></p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            </svg>
+        </div>
+    </div>
+
+    <!-- Thẻ 4: Giao dịch -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+        <div>
+            <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Tổng Đợt Chi Tiêu</p>
+            <p class="mt-1 text-2xl font-bold text-slate-900"><?= count($transactions) ?> <span class="text-sm font-normal text-slate-500">hóa đơn</span></p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+            </svg>
+        </div>
+    </div>
+</div>
+
+<!-- Khối Bảng Tổng Kết Công Nợ Tự Động (Tập trung & Quan trọng nhất) -->
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
+    <div class="px-6 py-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-slate-50/50">
+        <div>
+            <h2 class="text-lg font-bold text-slate-900 flex items-center space-x-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                <span>Bảng Tổng Kết Công Nợ (Ai nợ ai bao nhiêu)</span>
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">Tự động cấn trừ 2 chiều theo thời gian thực sau mỗi đợt chi tiêu</p>
+        </div>
+        <div class="flex items-center space-x-2">
+            <a href="settlements.php" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition">
+                Xem lịch sử gạch nợ &rarr;
+            </a>
+        </div>
+    </div>
+
+    <?php if (empty($debts)): ?>
+        <div class="py-12 text-center">
+            <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                </svg>
+            </div>
+            <p class="text-sm font-semibold text-slate-800">Tất cả mọi người đã sòng phẳng!</p>
+            <p class="text-xs text-slate-500 mt-1">Không có khoản nợ nào tồn đọng trong nhóm.</p>
+        </div>
+    <?php else: ?>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-slate-200 text-sm">
+                <thead class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase">
+                    <tr>
+                        <th class="px-6 py-3 text-left">Người nợ (Debtor)</th>
+                        <th class="px-6 py-3 text-center">Quan hệ</th>
+                        <th class="px-6 py-3 text-left">Chủ nợ (Creditor)</th>
+                        <th class="px-6 py-3 text-right">Số tiền nợ</th>
+                        <th class="px-6 py-3 text-right">Cập nhật</th>
+                        <th class="px-6 py-3 text-center">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 font-medium">
+                    <?php foreach ($debts as $d): ?>
+                        <tr class="hover:bg-slate-50/80 transition">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 rounded-full bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center">
+                                        <?= mb_substr($d['debtor_name'], 0, 1, 'UTF-8') ?>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-slate-900"><?= htmlspecialchars($d['debtor_name']) ?></div>
+                                        <div class="text-xs text-slate-400"><?= htmlspecialchars($d['debtor_phone'] ?? 'Không có SĐT') ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center text-xs text-slate-400">
+                                <span class="px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium inline-flex items-center">
+                                    nợ
+                                    <svg class="w-3.5 h-3.5 ml-1 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                    </svg>
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 font-bold text-xs flex items-center justify-center">
+                                        <?= mb_substr($d['creditor_name'], 0, 1, 'UTF-8') ?>
+                                    </div>
+                                    <div>
+                                        <div class="font-semibold text-slate-900"><?= htmlspecialchars($d['creditor_name']) ?></div>
+                                        <div class="text-xs text-slate-400"><?= htmlspecialchars($d['creditor_phone'] ?? 'Không có SĐT') ?></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
+                                <span class="text-base font-bold text-rose-600">
+                                    <?= number_format($d['amount']) ?> đ
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-xs text-slate-400 font-normal">
+                                <?= htmlspecialchars(substr($d['updated_at'], 0, 16)) ?>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <button type="button" 
+                                        onclick="openSettleModal(<?= $d['debtor_id'] ?>, '<?= htmlspecialchars(addslashes($d['debtor_name'])) ?>', <?= $d['creditor_id'] ?>, '<?= htmlspecialchars(addslashes($d['creditor_name'])) ?>', <?= $d['amount'] ?>)"
+                                        class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition">
+                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                    Gạch Nợ
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Giao Dịch Gần Đây -->
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div class="px-6 py-5 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <h2 class="text-base font-bold text-slate-900">Các Giao Dịch Chi Tiêu Gần Đây</h2>
+        <a href="transactions.php" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition">
+            Xem tất cả (<?= count($transactions) ?>) &rarr;
+        </a>
+    </div>
+
+    <?php if (empty($transactions)): ?>
+        <div class="py-8 text-center text-sm text-slate-400">
+            Chưa có đợt chi tiêu nào được tạo.
+        </div>
+    <?php else: ?>
+        <div class="divide-y divide-slate-100 text-sm">
+            <?php foreach ($transactions as $tx): ?>
+                <div class="p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 hover:bg-slate-50 transition">
+                    <div class="flex items-start space-x-3">
+                        <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600 flex-shrink-0 font-bold text-xs">
+                            #<?= $tx['id'] ?>
+                        </div>
+                        <div>
+                            <div class="font-semibold text-slate-900 text-base"><?= htmlspecialchars($tx['title']) ?></div>
+                            <div class="text-xs text-slate-500 mt-0.5">
+                                Người trả: <span class="font-semibold text-emerald-700"><?= htmlspecialchars($tx['payer_name']) ?></span> &bull; <?= htmlspecialchars(substr($tx['created_at'], 0, 16)) ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-4 self-end sm:self-center">
+                        <span class="text-base font-bold text-slate-900"><?= number_format($tx['total_amount']) ?> đ</span>
+                        <span class="px-2.5 py-0.5 text-xs font-semibold rounded-full <?= $tx['status'] === 'completed' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800' ?>">
+                            <?= $tx['status'] === 'completed' ? 'Hoàn thành' : 'Nháp' ?>
+                        </span>
+                        <a href="transaction_detail.php?id=<?= $tx['id'] ?>" class="text-xs font-semibold text-slate-600 hover:text-emerald-600 transition px-2.5 py-1 rounded-lg border border-slate-200 hover:border-emerald-300">
+                            Chi tiết
+                        </a>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+    <?php endif; ?>
+</div>
+
+<!-- Modal Gạch Nợ / Thanh Toán Nhanh -->
+<div id="settleModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-slate-900">Gạch Nợ / Xác Nhận Thanh Toán</h3>
+            <button onclick="closeSettleModal()" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <form method="POST" action="index.php" class="mt-4 space-y-4">
+            <input type="hidden" name="action" value="settle">
+            <input type="hidden" name="debtor_id" id="modalDebtorId">
+            <input type="hidden" name="creditor_id" id="modalCreditorId">
+
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm">
+                <div class="flex justify-between items-center text-xs text-slate-500 mb-1">
+                    <span>Người trả tiền:</span>
+                    <span>Người nhận:</span>
+                </div>
+                <div class="flex justify-between items-center font-bold text-slate-800">
+                    <span id="modalDebtorName" class="text-rose-700"></span>
+                    <span class="text-slate-400 text-xs font-normal">&rarr;</span>
+                    <span id="modalCreditorName" class="text-emerald-700"></span>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Số tiền thanh toán (VNĐ)</label>
+                <input type="number" 
+                       name="amount" 
+                       id="modalAmount" 
+                       required 
+                       min="1" 
+                       step="1"
+                       class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-bold text-slate-900">
+                <p class="text-[11px] text-slate-400 mt-1">Có thể thanh toán toàn bộ hoặc trả trước một phần.</p>
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi chú thanh toán</label>
+                <input type="text" 
+                       name="note" 
+                       placeholder="Ví dụ: Chuyển khoản Vietcombank, tiền mặt..." 
+                       class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+            </div>
+
+            <div class="pt-2 flex justify-end space-x-3">
+                <button type="button" onclick="closeSettleModal()" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                    Hủy
+                </button>
+                <button type="submit" class="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition">
+                    Xác nhận Gạch Nợ
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openSettleModal(debtorId, debtorName, creditorId, creditorName, amount) {
+    document.getElementById('modalDebtorId').value = debtorId;
+    document.getElementById('modalCreditorId').value = creditorId;
+    document.getElementById('modalDebtorName').textContent = debtorName;
+    document.getElementById('modalCreditorName').textContent = creditorName;
+    document.getElementById('modalAmount').value = Math.round(amount);
+    document.getElementById('settleModal').classList.remove('hidden');
+}
+
+function closeSettleModal() {
+    document.getElementById('settleModal').classList.add('hidden');
+}
+</script>
+
+<?php require_once __DIR__ . '/includes/footer.php'; ?>

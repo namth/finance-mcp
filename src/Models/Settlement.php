@@ -76,8 +76,9 @@ class Settlement
         }
 
         if ($memberId !== null) {
-            $conditions[] = "(s.debtor_id = :mid OR s.creditor_id = :mid)";
-            $params[':mid'] = $memberId;
+            $conditions[] = "(s.debtor_id = :mid1 OR s.creditor_id = :mid2)";
+            $params[':mid1'] = $memberId;
+            $params[':mid2'] = $memberId;
         }
 
         if (!empty($conditions)) {

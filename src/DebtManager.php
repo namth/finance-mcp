@@ -210,8 +210,9 @@ class DebtManager
         }
 
         if ($memberId !== null) {
-            $sql .= " AND (d.debtor_id = :mid OR d.creditor_id = :mid)";
-            $params[':mid'] = $memberId;
+            $sql .= " AND (d.debtor_id = :mid1 OR d.creditor_id = :mid2)";
+            $params[':mid1'] = $memberId;
+            $params[':mid2'] = $memberId;
         }
 
         $sql .= " ORDER BY d.amount DESC";

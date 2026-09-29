@@ -138,7 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 }
             }
         } catch (\Throwable $e) {
-            $errorMessage = "Lỗi CSDL: " . $e->getMessage() . ". Hãy đảm bảo bạn đã import file schema_multiuser.sql vào MySQL.";
+            $errorMessage = "Lỗi CSDL: " . $e->getMessage();
         }
     }
 }

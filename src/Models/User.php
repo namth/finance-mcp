@@ -138,8 +138,12 @@ class User
     public function findByUsernameOrEmail(string $login): ?array
     {
         $login = strtolower(trim($login));
-        $stmt = $this->db->prepare("SELECT id, username, email, full_name, api_key, created_at FROM users WHERE username = :login OR email = :login");
-        $stmt->execute([':login' => $login]);
+        $stmt = $this->db->prepare("
+            SELECT `id`, `username`, `email`, `full_name`, `api_key`, `created_at` 
+            FROM `users` 
+            WHERE LOWER(`username`) = :login1 OR LOWER(`email`) = :login2
+        ");
+        $stmt->execute([':login1' => $login, ':login2' => $login]);
         $row = $stmt->fetch();
         return $row ?: null;
     }

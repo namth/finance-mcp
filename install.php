@@ -359,17 +359,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Tên đăng nhập (Username) *</label>
-                                <input type="text" name="username" value="<?= htmlspecialchars($_POST['username'] ?? 'admin') ?>" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <input type="text" name="username" value="<?= htmlspecialchars($_POST['username'] ?? '') ?>" placeholder="Ví dụ: admin" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
                             </div>
                             <div>
                                 <label class="block text-xs font-semibold text-slate-700 mb-1">Họ và tên *</label>
-                                <input type="text" name="full_name" value="<?= htmlspecialchars($_POST['full_name'] ?? 'Quản Trị Viên') ?>" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                                <input type="text" name="full_name" value="<?= htmlspecialchars($_POST['full_name'] ?? '') ?>" placeholder="Ví dụ: Quản Trị Viên" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
                             </div>
                         </div>
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-1">Địa chỉ Email *</label>
-                            <input type="email" name="email" value="<?= htmlspecialchars($_POST['email'] ?? 'admin@example.com') ?>" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
+                            <input type="email" name="email" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" placeholder="admin@domain.com" required class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none">
                         </div>
                     </div>
 
@@ -384,18 +384,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                         <div id="events-container" class="space-y-2.5">
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                                <input type="text" name="event_names[]" value="Sinh nhật của tôi" placeholder="Tên mốc sự kiện" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
-                                <input type="date" name="event_dates[]" value="1986-07-14" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
+                                <input type="text" name="event_names[]" value="" placeholder="Mốc ký ức 1 (Ví dụ: Kỷ niệm ngày cưới)" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
+                                <input type="date" name="event_dates[]" value="" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
                             </div>
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                                <input type="text" name="event_names[]" value="Sinh nhật của vợ tôi" placeholder="Tên mốc sự kiện" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
-                                <input type="date" name="event_dates[]" value="1995-09-21" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
+                                <input type="text" name="event_names[]" value="" placeholder="Mốc ký ức 2 (Ví dụ: Ngày tốt nghiệp)" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
+                                <input type="date" name="event_dates[]" value="" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
                             </div>
 
                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
-                                <input type="text" name="event_names[]" value="Kỷ niệm ngày cưới" placeholder="Tên mốc sự kiện" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
-                                <input type="date" name="event_dates[]" value="2021-03-20" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
+                                <input type="text" name="event_names[]" value="" placeholder="Mốc ký ức 3 (Ví dụ: Ngày mua xe đầu tiên)" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none">
+                                <input type="date" name="event_dates[]" value="" required class="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none font-mono">
                             </div>
                         </div>
 

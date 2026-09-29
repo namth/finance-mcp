@@ -162,9 +162,14 @@ if (!$lockFp || !flock($lockFp, LOCK_EX | LOCK_NB)) {
 // 5. Xác định nhánh Git & Hành động
 $targetBranch = $_GET['branch'] ?? $_POST['branch'] ?? $defaultBranch;
 
-// Nếu là GitHub Webhook push event, tự động lấy nhánh từ payload
-if ($isGithubWebhook && !empty($rawPayload)) {
-    $payloadData = json_decode($rawPayload, true);
+// Nếu là GitHub Webhook push event, tự động lấy nhánh từ payload (hỗ trợ cả JSON và Form Urlencoded)
+if ($isGithubWebhook) {
+    $payloadData = null;
+    if (!empty($_POST['payload'])) {
+        $payloadData = json_decode($_POST['payload'], true);
+    } elseif (!empty($rawPayload)) {
+        $payloadData = json_decode($rawPayload, true);
+    }
     if (isset($payloadData['ref'])) {
         $pushedBranch = str_replace('refs/heads/', '', $payloadData['ref']);
         if (!empty($pushedBranch)) {

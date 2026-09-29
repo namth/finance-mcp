@@ -137,6 +137,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `email` VARCHAR(100) NOT NULL UNIQUE,
             `full_name` VARCHAR(100) NOT NULL,
             `api_key` VARCHAR(64) NOT NULL UNIQUE,
+            `bank_bin` VARCHAR(20) DEFAULT NULL,
+            `bank_name` VARCHAR(100) DEFAULT NULL,
+            `bank_account_no` VARCHAR(50) DEFAULT NULL,
+            `bank_account_name` VARCHAR(100) DEFAULT NULL,
             `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -172,10 +176,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         CREATE TABLE IF NOT EXISTS `members` (
             `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            `user_id` INT UNSIGNED DEFAULT NULL,
             `name` VARCHAR(100) NOT NULL,
             `phone` VARCHAR(20) DEFAULT NULL,
             `email` VARCHAR(100) DEFAULT NULL,
-            `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+            `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+            INDEX (`user_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
         CREATE TABLE IF NOT EXISTS `places` (
@@ -242,8 +248,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `debtor_id` INT UNSIGNED NOT NULL,
             `creditor_id` INT UNSIGNED NOT NULL,
             `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+            `debt_token` VARCHAR(64) DEFAULT NULL,
+            `payment_notified_at` DATETIME DEFAULT NULL,
             `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX (`group_id`),
+            INDEX (`debt_token`),
             UNIQUE KEY `uk_group_debtor_creditor` (`group_id`, `debtor_id`, `creditor_id`),
             FOREIGN KEY (`debtor_id`) REFERENCES `members`(`id`) ON DELETE CASCADE,
             FOREIGN KEY (`creditor_id`) REFERENCES `members`(`id`) ON DELETE CASCADE

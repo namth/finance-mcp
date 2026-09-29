@@ -17,6 +17,7 @@ use SimpleFinance\Models\Member;
 use SimpleFinance\Models\Product;
 use SimpleFinance\Models\Transaction;
 use SimpleFinance\DebtManager;
+use SimpleFinance\BankList;
 
 $dbError = null;
 $members = [];
@@ -224,6 +225,14 @@ require_once __DIR__ . '/includes/header.php';
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
                                     </svg>
                                 </span>
+                                <?php if (!empty($d['payment_notified_at'])): ?>
+                                    <div class="mt-1">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 animate-pulse" title="Con nợ đã báo chuyển khoản lúc <?= htmlspecialchars(substr($d['payment_notified_at'], 0, 16)) ?>">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1"></span>
+                                            Đã báo CK
+                                        </span>
+                                    </div>
+                                <?php endif; ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center space-x-3">
@@ -245,14 +254,36 @@ require_once __DIR__ . '/includes/header.php';
                                 <?= htmlspecialchars(substr($d['updated_at'], 0, 16)) ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <button type="button" 
-                                        onclick="openSettleModal(<?= $d['debtor_id'] ?>, '<?= htmlspecialchars(addslashes($d['debtor_name'])) ?>', <?= $d['creditor_id'] ?>, '<?= htmlspecialchars(addslashes($d['creditor_name'])) ?>', <?= $d['amount'] ?>)"
-                                        class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition">
-                                    <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                                    </svg>
-                                    Gạch Nợ
-                                </button>
+                                <div class="flex items-center justify-center space-x-1.5">
+                                    <button type="button" 
+                                            onclick='openQrModal(<?= json_encode([
+                                                'debt_id'             => $d['id'],
+                                                'debtor_name'         => $d['debtor_name'],
+                                                'creditor_name'       => $d['creditor_name'],
+                                                'amount'              => (float)$d['amount'],
+                                                'token'               => $d['debt_token'] ?? '',
+                                                'bank_bin'            => $d['bank_bin'] ?? '',
+                                                'bank_name'           => $d['bank_name'] ?? '',
+                                                'bank_account_no'     => $d['bank_account_no'] ?? '',
+                                                'bank_account_name'   => $d['bank_account_name'] ?? $d['creditor_name'],
+                                                'payment_notified_at' => $d['payment_notified_at'] ?? null,
+                                            ], JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP) ?>)'
+                                            class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 shadow-2xs transition"
+                                            title="Xem mã QR thanh toán hoặc lấy link gửi con nợ">
+                                        <svg class="w-3.5 h-3.5 mr-1 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                                        </svg>
+                                        Mã QR
+                                    </button>
+                                    <button type="button" 
+                                            onclick="openSettleModal(<?= $d['debtor_id'] ?>, '<?= htmlspecialchars(addslashes($d['debtor_name'])) ?>', <?= $d['creditor_id'] ?>, '<?= htmlspecialchars(addslashes($d['creditor_name'])) ?>', <?= $d['amount'] ?>)"
+                                            class="inline-flex items-center px-3 py-1 rounded-lg text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 shadow-sm transition">
+                                        <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        Gạch Nợ
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     <?php endforeach; ?>
@@ -367,7 +398,226 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- ============================================== -->
+<!-- MODAL XEM MÃ VIETQR & LINK CHIA SẺ THANH TOÁN -->
+<!-- ============================================== -->
+<div id="qrModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <h3 class="text-base font-bold text-slate-900 flex items-center">
+                <svg class="w-5 h-5 mr-1.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                </svg>
+                Mã VietQR & Link Trả Nợ
+            </h3>
+            <button type="button" onclick="closeQrModal()" class="text-slate-400 hover:text-slate-600">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <div class="mt-4 space-y-4">
+            <!-- Tóm tắt khoản nợ -->
+            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+                <div class="flex justify-between items-center text-slate-500 mb-1">
+                    <span>Người nợ:</span>
+                    <span>Người nhận (Chủ nợ):</span>
+                </div>
+                <div class="flex justify-between items-center font-bold text-slate-800 text-sm">
+                    <span id="qrDebtorName" class="text-rose-700"></span>
+                    <span class="text-slate-400 text-xs font-normal">&rarr;</span>
+                    <span id="qrCreditorName" class="text-emerald-700"></span>
+                </div>
+                <div class="mt-2 pt-2 border-t border-slate-200/60 flex justify-between items-center">
+                    <span class="text-slate-500">Số tiền nợ:</span>
+                    <span id="qrAmountDisplay" class="text-base font-extrabold text-rose-600"></span>
+                </div>
+            </div>
+
+            <!-- Trường hợp đã cài đặt ngân hàng -->
+            <div id="qrContentWithBank" class="space-y-4 text-center">
+                <div class="inline-block bg-white p-2.5 rounded-2xl shadow-sm border border-slate-200">
+                    <img id="qrModalImg" src="" alt="VietQR" class="w-56 h-auto mx-auto rounded-lg">
+                </div>
+
+                <div class="text-left bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Ngân hàng:</span>
+                        <span id="qrBankName" class="font-bold text-slate-800"></span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-500">Số tài khoản:</span>
+                        <div class="flex items-center space-x-1.5">
+                            <span id="qrAccountNo" class="font-mono font-bold text-emerald-800"></span>
+                            <button type="button" onclick="copyFromElem('qrAccountNo', 'Đã chép số tài khoản!')" class="text-emerald-600 hover:text-emerald-800" title="Sao chép">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-500">Chủ tài khoản:</span>
+                        <span id="qrAccountName" class="font-bold text-slate-800 uppercase"></span>
+                    </div>
+                </div>
+
+                <!-- Link chia sẻ công khai -->
+                <div class="text-left space-y-1">
+                    <label class="block text-[11px] font-semibold text-slate-700 uppercase">Link thanh toán gửi cho con nợ:</label>
+                    <div class="flex items-center space-x-2">
+                        <input type="text" readonly id="qrShareLink" class="w-full px-3 py-2 text-xs font-mono rounded-xl border border-slate-300 bg-slate-50 select-all text-slate-700">
+                        <button type="button" onclick="copyShareLink()" class="px-3.5 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl whitespace-nowrap shadow-sm transition">
+                            Sao Chép
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Các nút hành động nhanh -->
+                <div class="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" onclick="copyReminderText()" class="w-full py-2 px-3 text-xs font-semibold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition flex items-center justify-center space-x-1">
+                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                        <span>Chép Tin Nhắc Nợ</span>
+                    </button>
+                    <a id="qrDownloadBtn" href="" download="" target="_blank" class="w-full py-2 px-3 text-xs font-semibold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition flex items-center justify-center space-x-1">
+                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        <span>Tải Ảnh QR</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Trường hợp chủ nợ chưa cấu hình ngân hàng -->
+            <div id="qrContentNoBank" class="hidden text-center py-4 space-y-3">
+                <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <h4 class="text-sm font-bold text-slate-800">Chưa Cấu Hình Tài Khoản Ngân Hàng</h4>
+                <p class="text-xs text-slate-500 leading-relaxed">
+                    Chủ nợ (<strong id="noBankCreditorName"></strong>) chưa cài đặt STK ngân hàng trong trang Cá Nhân nên hệ thống chưa thể tự tạo mã VietQR.
+                </p>
+                <div class="pt-2">
+                    <a href="profile.php" class="inline-flex items-center px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm">
+                        Đến Trang Cá Nhân Cài Đặt STK &rarr;
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="pt-4 border-t border-slate-100 mt-5 flex justify-end">
+            <button type="button" onclick="closeQrModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                Đóng
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Copy -->
+<div id="copyToast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-semibold shadow-2xl opacity-0 pointer-events-none transition-opacity duration-200 flex items-center space-x-1.5 z-50">
+    <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+    </svg>
+    <span id="copyToastText">Đã sao chép!</span>
+</div>
+
 <script>
+let currentQrData = null;
+
+function removeVietnameseAccents(str) {
+    if (!str) return '';
+    return str.normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+              .replace(/[^a-zA-Z0-9 ]/g, '');
+}
+
+function openQrModal(data) {
+    currentQrData = data;
+    document.getElementById('qrDebtorName').textContent = data.debtor_name;
+    document.getElementById('qrCreditorName').textContent = data.creditor_name;
+    document.getElementById('qrAmountDisplay').textContent = Number(data.amount).toLocaleString() + ' đ';
+
+    const hasBank = data.bank_bin && data.bank_account_no;
+    const withBankSec = document.getElementById('qrContentWithBank');
+    const noBankSec = document.getElementById('qrContentNoBank');
+
+    // Tạo link công khai
+    const host = window.location.origin;
+    const path = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+    const shareUrl = `${host}${path}/pay.php?token=${encodeURIComponent(data.token)}`;
+    document.getElementById('qrShareLink').value = shareUrl;
+
+    if (hasBank) {
+        withBankSec.classList.remove('hidden');
+        noBankSec.classList.add('hidden');
+
+        document.getElementById('qrBankName').textContent = data.bank_name || data.bank_bin;
+        document.getElementById('qrAccountNo').textContent = data.bank_account_no;
+        document.getElementById('qrAccountName').textContent = data.bank_account_name || data.creditor_name;
+
+        const cleanMemo = removeVietnameseAccents(`${data.debtor_name} tra no ${data.creditor_name} SF`).trim();
+        const qrUrl = `https://img.vietqr.io/image/${data.bank_bin}-${data.bank_account_no}-compact2.png?amount=${Math.round(data.amount)}&addInfo=${encodeURIComponent(cleanMemo)}&accountName=${encodeURIComponent(data.bank_account_name || data.creditor_name)}`;
+
+        const img = document.getElementById('qrModalImg');
+        img.src = qrUrl;
+
+        const dlBtn = document.getElementById('qrDownloadBtn');
+        dlBtn.href = qrUrl;
+        dlBtn.download = `vietqr_${data.debt_id}.png`;
+    } else {
+        withBankSec.classList.add('hidden');
+        noBankSec.classList.remove('hidden');
+        document.getElementById('noBankCreditorName').textContent = data.creditor_name;
+    }
+
+    document.getElementById('qrModal').classList.remove('hidden');
+}
+
+function closeQrModal() {
+    document.getElementById('qrModal').classList.add('hidden');
+}
+
+function copyShareLink() {
+    const input = document.getElementById('qrShareLink');
+    input.select();
+    navigator.clipboard.writeText(input.value).then(() => {
+        showToast('Đã chép link thanh toán gửi con nợ!');
+    });
+}
+
+function copyReminderText() {
+    if (!currentQrData) return;
+    const link = document.getElementById('qrShareLink').value;
+    const amountStr = Number(currentQrData.amount).toLocaleString() + ' đ';
+    const text = `Chào ${currentQrData.debtor_name}, mình gửi thông tin thanh toán khoản nợ ${amountStr}. Bạn quét mã QR hoặc mở link này để thanh toán nhé: ${link}`;
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('Đã chép tin nhắn nhắc nợ vào bộ nhớ tạm!');
+    });
+}
+
+function copyFromElem(elemId, msg) {
+    const text = document.getElementById(elemId).textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+        showToast(msg);
+    });
+}
+
+function showToast(text) {
+    const toast = document.getElementById('copyToast');
+    const toastText = document.getElementById('copyToastText');
+    toastText.textContent = text;
+    toast.classList.remove('opacity-0', 'pointer-events-none');
+    toast.classList.add('opacity-100');
+    setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0', 'pointer-events-none');
+    }, 2000);
+}
+
 function openSettleModal(debtorId, debtorName, creditorId, creditorName, amount) {
     document.getElementById('modalDebtorId').value = debtorId;
     document.getElementById('modalCreditorId').value = creditorId;
@@ -383,3 +633,4 @@ function closeSettleModal() {
 </script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>
+

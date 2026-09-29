@@ -80,15 +80,17 @@ class DebtManager
             $stmtUpd = $this->db->prepare("UPDATE `debts` SET `amount` = :amount WHERE `id` = :id");
             $stmtUpd->execute([':amount' => $newAmount, ':id' => $currentDebt['id']]);
         } else {
+            $debtToken = bin2hex(random_bytes(16));
             $stmtIns = $this->db->prepare("
-                INSERT INTO `debts` (`group_id`, `debtor_id`, `creditor_id`, `amount`)
-                VALUES (:group_id, :debtor_id, :creditor_id, :amount)
+                INSERT INTO `debts` (`group_id`, `debtor_id`, `creditor_id`, `amount`, `debt_token`)
+                VALUES (:group_id, :debtor_id, :creditor_id, :amount, :token)
             ");
             $stmtIns->execute([
                 ':group_id'    => $groupId,
                 ':debtor_id'   => $debtorId,
                 ':creditor_id' => $creditorId,
                 ':amount'      => $amount,
+                ':token'       => $debtToken,
             ]);
         }
     }
@@ -189,17 +191,22 @@ class DebtManager
     }
 
     /**
-     * Lấy danh sách tổng kết ai đang nợ ai bao nhiêu tiền theo nhóm
+     * Lấy danh sách tổng kết ai đang nợ ai bao nhiêu tiền theo nhóm kèm thông tin ngân hàng và mã QR
      */
     public function getSummary(?int $memberId = null, ?int $groupId = null): array
     {
+        // Đảm bảo schema debts và users sẵn sàng
+        (new Models\User($this->db))->ensureBankSchema();
+
         $sql = "
-            SELECT d.id, d.group_id, d.debtor_id, d.creditor_id, d.amount, d.updated_at,
+            SELECT d.id, d.group_id, d.debtor_id, d.creditor_id, d.amount, d.debt_token, d.payment_notified_at, d.updated_at,
                    deb.name AS debtor_name, deb.phone AS debtor_phone,
-                   cred.name AS creditor_name, cred.phone AS creditor_phone
+                   cred.name AS creditor_name, cred.phone AS creditor_phone,
+                   u.bank_bin, u.bank_name, u.bank_account_no, u.bank_account_name
             FROM `debts` d
             JOIN `members` deb ON d.debtor_id = deb.id
             JOIN `members` cred ON d.creditor_id = cred.id
+            LEFT JOIN `users` u ON cred.user_id = u.id OR (cred.user_id IS NULL AND (LOWER(cred.email) = LOWER(u.email) OR LOWER(cred.name) = LOWER(u.full_name)))
             WHERE d.amount > 0
         ";
         $params = [];
@@ -219,7 +226,70 @@ class DebtManager
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+
+        // Tự động gán debt_token nếu các khoản nợ cũ chưa có
+        foreach ($rows as &$r) {
+            if (empty($r['debt_token'])) {
+                $r['debt_token'] = bin2hex(random_bytes(16));
+                try {
+                    $this->db->prepare("UPDATE `debts` SET `debt_token` = :token WHERE `id` = :id")
+                             ->execute([':token' => $r['debt_token'], ':id' => $r['id']]);
+                } catch (\Throwable $e) {}
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Lấy thông tin chi tiết một khoản nợ dựa trên token chia sẻ công khai
+     */
+    public function getDebtByToken(string $token): ?array
+    {
+        $token = trim($token);
+        if (empty($token)) {
+            return null;
+        }
+
+        (new Models\User($this->db))->ensureBankSchema();
+
+        $sql = "
+            SELECT d.id, d.group_id, d.debtor_id, d.creditor_id, d.amount, d.debt_token, d.payment_notified_at, d.updated_at,
+                   deb.name AS debtor_name, deb.phone AS debtor_phone,
+                   cred.name AS creditor_name, cred.phone AS creditor_phone,
+                   u.bank_bin, u.bank_name, u.bank_account_no, u.bank_account_name,
+                   g.name AS group_name
+            FROM `debts` d
+            JOIN `members` deb ON d.debtor_id = deb.id
+            JOIN `members` cred ON d.creditor_id = cred.id
+            LEFT JOIN `users` u ON cred.user_id = u.id OR (cred.user_id IS NULL AND (LOWER(cred.email) = LOWER(u.email) OR LOWER(cred.name) = LOWER(u.full_name)))
+            LEFT JOIN `groups` g ON d.group_id = g.id
+            WHERE d.debt_token = :token AND d.amount > 0
+        ";
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([':token' => $token]);
+        $row = $stmt->fetch();
+        return $row ?: null;
+    }
+
+    /**
+     * Con nợ bấm nút xác nhận 'Tôi đã chuyển khoản'
+     */
+    public function notifyPayment(string $token): bool
+    {
+        $token = trim($token);
+        if (empty($token)) {
+            return false;
+        }
+
+        $stmt = $this->db->prepare("
+            UPDATE `debts` 
+            SET `payment_notified_at` = CURRENT_TIMESTAMP 
+            WHERE `debt_token` = :token AND `amount` > 0
+        ");
+        return $stmt->execute([':token' => $token]);
     }
 
     /**

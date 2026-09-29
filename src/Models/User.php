@@ -10,20 +10,104 @@ use InvalidArgumentException;
 class User
 {
     private PDO $db;
+    private static bool $schemaChecked = false;
 
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::getConnection();
+        $this->ensureBankSchema();
+    }
+
+    /**
+     * Tự động kiểm tra và thêm các cột ngân hàng, liên kết member, debt_token nếu chưa có
+     */
+    public function ensureBankSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+
+        try {
+            $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+            if ($driver === 'sqlite') {
+                // 1. Kiểm tra users
+                $userCols = $this->db->query("PRAGMA table_info(users)")->fetchAll();
+                $existingUserCols = array_column($userCols, 'name');
+
+                if (!in_array('bank_bin', $existingUserCols)) {
+                    $this->db->exec("ALTER TABLE users ADD COLUMN bank_bin TEXT DEFAULT NULL");
+                }
+                if (!in_array('bank_name', $existingUserCols)) {
+                    $this->db->exec("ALTER TABLE users ADD COLUMN bank_name TEXT DEFAULT NULL");
+                }
+                if (!in_array('bank_account_no', $existingUserCols)) {
+                    $this->db->exec("ALTER TABLE users ADD COLUMN bank_account_no TEXT DEFAULT NULL");
+                }
+                if (!in_array('bank_account_name', $existingUserCols)) {
+                    $this->db->exec("ALTER TABLE users ADD COLUMN bank_account_name TEXT DEFAULT NULL");
+                }
+
+                // 2. Kiểm tra members
+                $memberStmt = $this->db->query("PRAGMA table_info(members)");
+                if ($memberStmt) {
+                    $memCols = array_column($memberStmt->fetchAll(), 'name');
+                    if (!in_array('user_id', $memCols)) {
+                        $this->db->exec("ALTER TABLE members ADD COLUMN user_id INTEGER DEFAULT NULL");
+                    }
+                }
+
+                // 3. Kiểm tra debts
+                $debtStmt = $this->db->query("PRAGMA table_info(debts)");
+                if ($debtStmt) {
+                    $debtCols = array_column($debtStmt->fetchAll(), 'name');
+                    if (!in_array('debt_token', $debtCols)) {
+                        $this->db->exec("ALTER TABLE debts ADD COLUMN debt_token TEXT DEFAULT NULL");
+                    }
+                    if (!in_array('payment_notified_at', $debtCols)) {
+                        $this->db->exec("ALTER TABLE debts ADD COLUMN payment_notified_at DATETIME DEFAULT NULL");
+                    }
+                }
+            } else {
+                // MySQL / MariaDB
+                // 1. Cột ngân hàng trong users
+                $stmt = $this->db->query("SHOW COLUMNS FROM `users` LIKE 'bank_bin'");
+                if (!$stmt->fetch()) {
+                    $this->db->exec("
+                        ALTER TABLE `users` 
+                        ADD COLUMN `bank_bin` VARCHAR(20) DEFAULT NULL AFTER `api_key`,
+                        ADD COLUMN `bank_name` VARCHAR(100) DEFAULT NULL AFTER `bank_bin`,
+                        ADD COLUMN `bank_account_no` VARCHAR(50) DEFAULT NULL AFTER `bank_name`,
+                        ADD COLUMN `bank_account_name` VARCHAR(100) DEFAULT NULL AFTER `bank_account_no`
+                    ");
+                }
+
+                // 2. Cột user_id trong members
+                $stmtMem = $this->db->query("SHOW COLUMNS FROM `members` LIKE 'user_id'");
+                if (!$stmtMem->fetch()) {
+                    $this->db->exec("ALTER TABLE `members` ADD COLUMN `user_id` INT UNSIGNED DEFAULT NULL AFTER `id`, ADD INDEX (`user_id`)");
+                }
+
+                // 3. Cột debt_token và payment_notified_at trong debts
+                $stmtDebt = $this->db->query("SHOW COLUMNS FROM `debts` LIKE 'debt_token'");
+                if (!$stmtDebt->fetch()) {
+                    $this->db->exec("
+                        ALTER TABLE `debts` 
+                        ADD COLUMN `debt_token` VARCHAR(64) DEFAULT NULL AFTER `amount`,
+                        ADD COLUMN `payment_notified_at` DATETIME DEFAULT NULL AFTER `debt_token`,
+                        ADD INDEX (`debt_token`)
+                    ");
+                }
+            }
+
+            self::$schemaChecked = true;
+        } catch (\Throwable $e) {
+            // Bỏ qua lỗi DDL
+        }
     }
 
     /**
      * Tạo tài khoản người dùng mới kèm các mốc ký ức bí mật được mã hóa
-     *
-     * @param string $username
-     * @param string $email
-     * @param string $fullName
-     * @param array $timelineEvents Mảng ['Tên sự kiện' => 'DD-MM-YYYY', ...]
-     * @return array
      */
     public function create(string $username, string $email, string $fullName, array $timelineEvents): array
     {
@@ -85,9 +169,7 @@ class User
                     continue;
                 }
 
-                // Mã hóa bằng AES-256-CBC
                 $encryptedDate = Crypto::encrypt($rawDate);
-
                 $stmtEvent->execute([
                     ':user_id'              => $userId,
                     ':event_name'           => $eventName,
@@ -119,6 +201,22 @@ class User
                 ':display_name' => $fullName,
             ]);
 
+            // 4. Tự động liên kết hoặc tạo bản ghi trong bảng members
+            try {
+                $stmtFindMem = $this->db->prepare("SELECT id FROM members WHERE LOWER(name) = :name OR LOWER(email) = :email LIMIT 1");
+                $stmtFindMem->execute([':name' => strtolower($fullName), ':email' => $email]);
+                $memRow = $stmtFindMem->fetch();
+                if ($memRow) {
+                    $this->db->prepare("UPDATE members SET user_id = :uid WHERE id = :id")->execute([':uid' => $userId, ':id' => $memRow['id']]);
+                } else {
+                    $this->db->prepare("INSERT INTO members (user_id, name, email) VALUES (:uid, :name, :email)")->execute([
+                        ':uid'   => $userId,
+                        ':name'  => $fullName,
+                        ':email' => $email,
+                    ]);
+                }
+            } catch (\Throwable $e) {}
+
             $this->db->commit();
             return $this->findById($userId);
         } catch (\Throwable $e) {
@@ -129,7 +227,12 @@ class User
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->db->prepare("SELECT id, username, email, full_name, api_key, created_at FROM users WHERE id = :id");
+        $stmt = $this->db->prepare("
+            SELECT id, username, email, full_name, api_key, 
+                   bank_bin, bank_name, bank_account_no, bank_account_name, created_at 
+            FROM users 
+            WHERE id = :id
+        ");
         $stmt->execute([':id' => $id]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -139,7 +242,8 @@ class User
     {
         $login = strtolower(trim($login));
         $stmt = $this->db->prepare("
-            SELECT `id`, `username`, `email`, `full_name`, `api_key`, `created_at` 
+            SELECT `id`, `username`, `email`, `full_name`, `api_key`,
+                   `bank_bin`, `bank_name`, `bank_account_no`, `bank_account_name`, `created_at` 
             FROM `users` 
             WHERE LOWER(`username`) = :login1 OR LOWER(`email`) = :login2
         ");
@@ -151,7 +255,12 @@ class User
     public function findByApiKey(string $apiKey): ?array
     {
         $apiKey = trim($apiKey);
-        $stmt = $this->db->prepare("SELECT id, username, email, full_name, api_key, created_at FROM users WHERE api_key = :api_key");
+        $stmt = $this->db->prepare("
+            SELECT id, username, email, full_name, api_key, 
+                   bank_bin, bank_name, bank_account_no, bank_account_name, created_at 
+            FROM users 
+            WHERE api_key = :api_key
+        ");
         $stmt->execute([':api_key' => $apiKey]);
         $row = $stmt->fetch();
         return $row ?: null;
@@ -191,10 +300,64 @@ class User
         $email = strtolower(trim($email));
 
         $stmt = $this->db->prepare("UPDATE users SET full_name = :full_name, email = :email WHERE id = :id");
-        return $stmt->execute([
+        $res = $stmt->execute([
             ':full_name' => $fullName,
             ':email'     => $email,
             ':id'        => $userId,
         ]);
+
+        // Cập nhật hoặc liên kết thành viên
+        try {
+            $this->db->prepare("UPDATE members SET user_id = :uid WHERE (LOWER(email) = :email OR LOWER(name) = :name) AND user_id IS NULL")
+                     ->execute([':uid' => $userId, ':email' => $email, ':name' => strtolower($fullName)]);
+        } catch (\Throwable $e) {}
+
+        return $res;
+    }
+
+    /**
+     * Cập nhật thông tin tài khoản ngân hàng của người dùng (VietQR)
+     */
+    public function updateBankInfo(
+        int $userId,
+        ?string $bankBin,
+        ?string $bankName,
+        ?string $accountNo,
+        ?string $accountName
+    ): bool {
+        $bankBin = $bankBin ? trim($bankBin) : null;
+        $bankName = $bankName ? trim($bankName) : null;
+        $accountNo = $accountNo ? preg_replace('/[^0-9a-zA-Z]/', '', trim($accountNo)) : null;
+        $accountName = $accountName ? mb_strtoupper(trim($accountName), 'UTF-8') : null;
+
+        $stmt = $this->db->prepare("
+            UPDATE users 
+            SET bank_bin = :bin, bank_name = :name, bank_account_no = :acc, bank_account_name = :acc_name 
+            WHERE id = :id
+        ");
+        $res = $stmt->execute([
+            ':bin'      => $bankBin,
+            ':name'     => $bankName,
+            ':acc'      => $accountNo,
+            ':acc_name' => $accountName,
+            ':id'       => $userId,
+        ]);
+
+        // Đảm bảo liên kết thành viên tương ứng
+        $user = $this->findById($userId);
+        if ($user) {
+            try {
+                $this->db->prepare("
+                    UPDATE members SET user_id = :uid 
+                    WHERE (LOWER(email) = :email OR LOWER(name) = :name) AND (user_id IS NULL OR user_id = :uid)
+                ")->execute([
+                    ':uid'   => $userId,
+                    ':email' => strtolower($user['email']),
+                    ':name'  => strtolower($user['full_name']),
+                ]);
+            } catch (\Throwable $e) {}
+        }
+
+        return $res;
     }
 }

@@ -138,3 +138,58 @@ PREPARE alterIfNotExists FROM @preparedStatement;
 EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
 
+-- 1. Bổ sung các cột ngân hàng vào users nếu chưa có
+SET @tablename = "users";
+SET @columnname = "bank_bin";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `users` ADD COLUMN `bank_bin` VARCHAR(20) DEFAULT NULL AFTER `api_key`, ADD COLUMN `bank_name` VARCHAR(100) DEFAULT NULL AFTER `bank_bin`, ADD COLUMN `bank_account_no` VARCHAR(50) DEFAULT NULL AFTER `bank_name`, ADD COLUMN `bank_account_name` VARCHAR(100) DEFAULT NULL AFTER `bank_account_no`;"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- 2. Bổ sung user_id vào members nếu chưa có
+SET @tablename = "members";
+SET @columnname = "user_id";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `members` ADD COLUMN `user_id` INT UNSIGNED DEFAULT NULL AFTER `id`, ADD INDEX (`user_id`);"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- 3. Bổ sung debt_token và payment_notified_at vào debts nếu chưa có
+SET @tablename = "debts";
+SET @columnname = "debt_token";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `debts` ADD COLUMN `debt_token` VARCHAR(64) DEFAULT NULL AFTER `amount`, ADD COLUMN `payment_notified_at` DATETIME DEFAULT NULL AFTER `debt_token`, ADD INDEX (`debt_token`);"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+

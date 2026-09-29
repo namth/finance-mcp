@@ -66,8 +66,11 @@ CREATE TABLE IF NOT EXISTS `debts` (
     `debtor_id` INT UNSIGNED NOT NULL COMMENT 'Người nợ',
     `creditor_id` INT UNSIGNED NOT NULL COMMENT 'Chủ nợ (người được nợ)',
     `amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00 COMMENT 'Số tiền còn nợ',
+    `debt_token` VARCHAR(64) DEFAULT NULL COMMENT 'Mã token chia sẻ thanh toán công khai',
+    `payment_notified_at` DATETIME DEFAULT NULL COMMENT 'Thời điểm con nợ bấm xác nhận đã chuyển khoản',
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY `uk_debtor_creditor` (`debtor_id`, `creditor_id`),
+    INDEX (`debt_token`),
     FOREIGN KEY (`debtor_id`) REFERENCES `members`(`id`) ON DELETE CASCADE,
     FOREIGN KEY (`creditor_id`) REFERENCES `members`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

@@ -2,10 +2,10 @@
 
 /**
  * File cấu hình hệ thống SimpleFinance (MySQL + Xác thực Admin)
- * Bạn hãy thay đổi các thông số dưới đây phù hợp với môi trường của mình.
+ * Bạn có thể tạo file config.local.php để ghi đè các cấu hình riêng trên server (không bị mất khi git pull).
  */
 
-return [
+$defaultConfig = [
     // 1. Cấu hình Cơ sở Dữ liệu MySQL
     'db' => [
         'host'     => '127.0.0.1',
@@ -49,3 +49,14 @@ return [
         'sinh nhật bố tôi'     => '10-10-1955',
     ],
 ];
+
+// Nếu có file config.local.php, ưu tiên nạp đè cấu hình cục bộ (dùng an toàn cho production server)
+$localConfigFile = __DIR__ . '/config.local.php';
+if (file_exists($localConfigFile)) {
+    $localConfig = require $localConfigFile;
+    if (is_array($localConfig)) {
+        return array_replace_recursive($defaultConfig, $localConfig);
+    }
+}
+
+return $defaultConfig;

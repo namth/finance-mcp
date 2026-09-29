@@ -22,7 +22,73 @@ spl_autoload_register(function ($class) {
 
 use SimpleFinance\Models\User;
 
-$userModel = new User();
+$userModel = null;
+$dbError = null;
+
+try {
+    $userModel = new User();
+} catch (\Throwable $e) {
+    $dbError = $e->getMessage();
+}
+
+// Nếu không kết nối được CSDL, hiển thị trang hướng dẫn khắc phục thay vì lỗi 500
+if ($dbError !== null) {
+    ?>
+    <!DOCTYPE html>
+    <html lang="vi">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Lỗi Kết Nối Cơ Sở Dữ Liệu - SimpleFinance</title>
+        <script src="https://cdn.tailwindcss.com"></script>
+    </head>
+    <body class="bg-slate-50 flex items-center justify-center min-h-screen p-4 font-sans">
+        <div class="max-w-lg w-full bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+            <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+            </div>
+            
+            <h1 class="text-xl font-bold text-slate-900 text-center">Chưa Kết Nối Được Cơ Sở Dữ Liệu</h1>
+            <p class="text-xs text-slate-500 text-center mt-1">Cần cấu hình thông tin MySQL trên máy chủ</p>
+
+            <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-xs font-mono text-red-700 break-all leading-relaxed">
+                <strong>Chi tiết lỗi:</strong><br>
+                <?= htmlspecialchars($dbError) ?>
+            </div>
+
+            <div class="mt-5 space-y-3 text-xs text-slate-600">
+                <p class="font-bold text-slate-800">🛠 Cách xử lý rất đơn giản:</p>
+                
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div>
+                        <p class="font-bold text-slate-900">1. Cập nhật thông số MySQL trong file <code class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">config.php</code> (hoặc tạo <code class="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">config.local.php</code>):</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Mở file cấu hình trên server và điền đúng <span class="font-mono text-slate-700">username</span>, <span class="font-mono text-slate-700">password</span>, <span class="font-mono text-slate-700">dbname</span> của database hosting.</p>
+                    </div>
+
+                    <div>
+                        <p class="font-bold text-slate-900">2. Đảm bảo đã import cấu trúc bảng:</p>
+                        <p class="text-[11px] text-slate-500 mt-1">Nếu database mới tinh, hãy import file <code class="font-mono text-slate-700">schema_multiuser.sql</code> vào database MySQL.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                <a href="login.php" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs text-center transition shadow-sm">
+                    Tải Lại Trang (Reload)
+                </a>
+                <a href="register.php" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs text-center transition">
+                    Đến Trang Đăng Ký
+                </a>
+            </div>
+        </div>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
 $errorMessage = '';
 
 // Xử lý nút "Đổi tài khoản khác"
@@ -41,22 +107,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     if (empty($loginInput)) {
         $errorMessage = "Vui lòng nhập tên đăng nhập hoặc email.";
     } else {
-        $user = $userModel->findByUsernameOrEmail($loginInput);
-        if (!$user) {
-            $errorMessage = "Không tìm thấy tài khoản với tên đăng nhập hoặc email này.";
-        } else {
-            $events = $userModel->getDecryptedTimelineEvents((int)$user['id']);
-            if (count($events) < 3) {
-                $errorMessage = "Tài khoản này chưa có đủ mốc ký ức để mở khóa. Vui lòng liên hệ quản trị.";
+        try {
+            $user = $userModel->findByUsernameOrEmail($loginInput);
+            if (!$user) {
+                $errorMessage = "Không tìm thấy tài khoản với tên đăng nhập hoặc email này.";
             } else {
-                $_SESSION['login_target_user_id']   = (int)$user['id'];
-                $_SESSION['login_target_user_name'] = $user['full_name'];
-                $_SESSION['login_target_username']  = $user['username'];
-                $_SESSION['login_fail_count']       = 0;
-                unset($_SESSION['login_quiz']);
-                header('Location: login.php');
-                exit;
+                $events = $userModel->getDecryptedTimelineEvents((int)$user['id']);
+                if (count($events) < 3) {
+                    $errorMessage = "Tài khoản này chưa có đủ mốc ký ức để mở khóa. Vui lòng liên hệ quản trị.";
+                } else {
+                    $_SESSION['login_target_user_id']   = (int)$user['id'];
+                    $_SESSION['login_target_user_name'] = $user['full_name'];
+                    $_SESSION['login_target_username']  = $user['username'];
+                    $_SESSION['login_fail_count']       = 0;
+                    unset($_SESSION['login_quiz']);
+                    header('Location: login.php');
+                    exit;
+                }
             }
+        } catch (\Throwable $e) {
+            $errorMessage = "Lỗi CSDL: " . $e->getMessage() . ". Hãy đảm bảo bạn đã import file schema_multiuser.sql vào MySQL.";
         }
     }
 }

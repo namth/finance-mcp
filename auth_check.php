@@ -23,8 +23,13 @@ spl_autoload_register(function ($class) {
 use SimpleFinance\Models\Group;
 use SimpleFinance\Models\User;
 
-$userModel = new User();
-$groupModel = new Group();
+try {
+    $userModel = new User();
+    $groupModel = new Group();
+} catch (\Throwable $e) {
+    header('Location: login.php');
+    exit;
+}
 
 $currentUser = $userModel->findById((int)$_SESSION['user_id']);
 if (!$currentUser) {

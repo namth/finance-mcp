@@ -3,4 +3,5 @@
 deploy.lock
 *.log
 .phpunit.result.cache
+config.php
 config.local.php

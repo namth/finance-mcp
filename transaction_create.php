@@ -140,57 +140,6 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <!-- Bước Chọn Quán (Tùy chọn) & Tạo quán nhanh / Thêm món cho quán -->
-            <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-700 uppercase">
-                            Quán / Địa Điểm <span class="text-slate-400 font-normal normal-case">(Tùy chọn)</span>
-                        </label>
-                        <p class="text-[11px] text-slate-400">Chọn quán để lọc đúng đơn giá món tại quán đó hoặc tạo nhanh quán mới</p>
-                    </div>
-                    <button type="button" onclick="openQuickPlaceModal()" class="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-lg text-emerald-700 bg-white border border-emerald-300 hover:bg-emerald-50 shadow-2xs transition">
-                        <svg class="w-3.5 h-3.5 mr-1 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Tạo Quán Mới
-                    </button>
-                </div>
-
-                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-                    <div class="sm:col-span-8">
-                        <select name="place_id" id="placeSelect" onchange="onPlaceChange(this.value)" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium bg-white">
-                            <option value="">-- Không chọn quán / Ăn uống tự do --</option>
-                            <?php foreach ($places as $pl): ?>
-                                <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>">
-                                    📍 <?= htmlspecialchars($pl['name']) ?><?= $pl['address'] ? ' (' . htmlspecialchars($pl['address']) . ')' : '' ?>
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-
-                    <div class="sm:col-span-4" id="addProdForPlaceBtnWrap" style="display: none;">
-                        <button type="button" onclick="openQuickProductModal()" class="w-full inline-flex items-center justify-center px-3.5 py-2 text-xs font-bold rounded-xl text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 transition shadow-2xs">
-                            <svg class="w-3.5 h-3.5 mr-1 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                            </svg>
-                            + Thêm Món Cho Quán Này
-                        </button>
-                    </div>
-                </div>
-
-                <div id="selectedPlaceNotice" class="hidden text-xs text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 flex items-center justify-between">
-                    <div class="flex items-center space-x-1.5 truncate">
-                        <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
-                        </svg>
-                        <span id="selectedPlaceLabel" class="font-bold truncate"></span>
-                    </div>
-                    <span class="text-[11px] text-emerald-600 font-semibold whitespace-nowrap ml-2">Đã ưu tiên các món của quán lên đầu danh sách</span>
-                </div>
-            </div>
-
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Trạng Thái</label>
@@ -207,11 +156,60 @@ require_once __DIR__ . '/includes/header.php';
             </div>
         </div>
 
-        <!-- Khối 2: Danh sách các món trong giao dịch -->
+        <!-- Khối 2: Quán / Địa Điểm (Tùy chọn) -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                    <h2 class="text-base font-bold text-slate-900">2. Chi Tiết Sản Phẩm & Phân Bổ Thành Viên</h2>
+                    <h2 class="text-base font-bold text-slate-900">2. Quán / Địa Điểm <span class="text-slate-400 font-normal text-xs">(Không bắt buộc)</span></h2>
+                    <p class="text-xs text-slate-500 mt-0.5">Chọn quán để lọc đúng đơn giá món tại quán đó hoặc tạo nhanh quán mới</p>
+                </div>
+                <button type="button" onclick="openQuickPlaceModal()" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-lg text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition shadow-2xs">
+                    <svg class="w-3.5 h-3.5 mr-1 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Tạo Quán Mới
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div class="sm:col-span-8">
+                    <select name="place_id" id="placeSelect" onchange="onPlaceChange(this.value)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium bg-white">
+                        <option value="">-- Không chọn quán / Ăn uống tự do --</option>
+                        <?php foreach ($places as $pl): ?>
+                            <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>">
+                                📍 <?= htmlspecialchars($pl['name']) ?><?= $pl['address'] ? ' (' . htmlspecialchars($pl['address']) . ')' : '' ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+
+                <div class="sm:col-span-4" id="addProdForPlaceBtnWrap" style="display: none;">
+                    <button type="button" onclick="openQuickProductModal()" class="w-full inline-flex items-center justify-center px-3.5 py-2.5 text-xs font-bold rounded-xl text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 transition shadow-2xs">
+                        <svg class="w-3.5 h-3.5 mr-1 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        + Thêm Món Cho Quán Này
+                    </button>
+                </div>
+            </div>
+
+            <div id="selectedPlaceNotice" class="hidden text-xs text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 flex items-center justify-between">
+                <div class="flex items-center space-x-1.5 truncate">
+                    <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span id="selectedPlaceLabel" class="font-bold truncate"></span>
+                </div>
+                <span class="text-[11px] text-emerald-600 font-semibold whitespace-nowrap ml-2">Đã ưu tiên các món của quán lên đầu danh sách</span>
+            </div>
+        </div>
+
+        <!-- Khối 3: Danh sách các món trong giao dịch -->
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div>
+                    <h2 class="text-base font-bold text-slate-900">3. Chi Tiết Sản Phẩm & Phân Bổ Thành Viên</h2>
                     <p class="text-xs text-slate-500 mt-0.5">Mỗi món có thể có nhiều người tham gia, tiền sẽ được chia đều tự động</p>
                 </div>
                 <button type="button" onclick="addItemRow()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition">

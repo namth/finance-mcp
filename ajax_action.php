@@ -24,13 +24,14 @@ try {
         case 'quick_place_create':
             $placeName = trim((string)($_POST['place_name'] ?? ''));
             $placeAddress = trim((string)($_POST['place_address'] ?? ''));
+            $mapUrl = trim((string)($_POST['map_url'] ?? ''));
 
             if (empty($placeName)) {
                 throw new \InvalidArgumentException("Vui lòng nhập tên quán / địa điểm.");
             }
 
             $placeModel = new Place();
-            $newPlace = $placeModel->create($placeName, $placeAddress ?: null, $currentGroupId);
+            $newPlace = $placeModel->create($placeName, $placeAddress ?: null, $currentGroupId, $mapUrl ?: null);
 
             echo json_encode([
                 'success' => true,

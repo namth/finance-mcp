@@ -36,9 +36,26 @@ class Place
                         group_id INTEGER NOT NULL DEFAULT 1,
                         name TEXT NOT NULL,
                         address TEXT,
+                        map_url TEXT DEFAULT NULL,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                     );
                 ");
+
+                // Kiểm tra xem bảng places đã có cột map_url chưa
+                $stmtPl = $this->db->query("PRAGMA table_info(places)");
+                if ($stmtPl) {
+                    $cols = $stmtPl->fetchAll();
+                    $hasMapUrl = false;
+                    foreach ($cols as $c) {
+                        if (($c['name'] ?? '') === 'map_url') {
+                            $hasMapUrl = true;
+                            break;
+                        }
+                    }
+                    if (!$hasMapUrl) {
+                        $this->db->exec("ALTER TABLE places ADD COLUMN map_url TEXT DEFAULT NULL");
+                    }
+                }
 
                 // Kiểm tra xem bảng products đã có cột place_id chưa
                 $stmt = $this->db->query("PRAGMA table_info(products)");
@@ -79,10 +96,17 @@ class Place
                         `group_id` INT UNSIGNED NOT NULL DEFAULT 1,
                         `name` VARCHAR(150) NOT NULL,
                         `address` VARCHAR(255) DEFAULT NULL,
+                        `map_url` TEXT DEFAULT NULL,
                         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                         INDEX (`group_id`)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                 ");
+
+                // Thêm cột map_url vào bảng places nếu chưa có
+                $stmtMap = $this->db->query("SHOW COLUMNS FROM `places` LIKE 'map_url'");
+                if (!$stmtMap->fetch()) {
+                    $this->db->exec("ALTER TABLE `places` ADD COLUMN `map_url` TEXT DEFAULT NULL AFTER `address`");
+                }
 
                 // 2. Thêm cột place_id vào bảng products nếu chưa có
                 $stmt = $this->db->query("SHOW COLUMNS FROM `products` LIKE 'place_id'");
@@ -108,7 +132,7 @@ class Place
     /**
      * Thêm mới một quán / địa điểm
      */
-    public function create(string $name, ?string $address = null, int $groupId = 1): array
+    public function create(string $name, ?string $address = null, int $groupId = 1, ?string $mapUrl = null): array
     {
         $name = trim($name);
         if (empty($name)) {
@@ -116,15 +140,17 @@ class Place
         }
 
         $address = $address ? trim($address) : null;
+        $mapUrl = $mapUrl ? trim($mapUrl) : null;
 
         $stmt = $this->db->prepare("
-            INSERT INTO `places` (`group_id`, `name`, `address`)
-            VALUES (:group_id, :name, :address)
+            INSERT INTO `places` (`group_id`, `name`, `address`, `map_url`)
+            VALUES (:group_id, :name, :address, :map_url)
         ");
         $stmt->execute([
             ':group_id' => $groupId,
             ':name'     => $name,
             ':address'  => $address,
+            ':map_url'  => $mapUrl,
         ]);
 
         $id = (int)$this->db->lastInsertId();
@@ -182,6 +208,12 @@ class Place
             $address = $data['address'] ? trim((string)$data['address']) : null;
             $fields[] = "`address` = :address";
             $params[':address'] = $address;
+        }
+
+        if (array_key_exists('map_url', $data)) {
+            $mapUrl = $data['map_url'] ? trim((string)$data['map_url']) : null;
+            $fields[] = "`map_url` = :map_url";
+            $params[':map_url'] = $mapUrl;
         }
 
         if (!empty($fields)) {

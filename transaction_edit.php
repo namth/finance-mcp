@@ -222,7 +222,7 @@ require_once __DIR__ . '/includes/header.php';
                         $selectedPlace = (int)($_POST['place_id'] ?? ($tx['place_id'] ?? 0));
                         foreach ($places as $pl): 
                         ?>
-                            <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>" <?= $selectedPlace === (int)$pl['id'] ? 'selected' : '' ?>>
+                            <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>" data-map-url="<?= htmlspecialchars($pl['map_url'] ?: '') ?>" <?= $selectedPlace === (int)$pl['id'] ? 'selected' : '' ?>>
                                 📍 <?= htmlspecialchars($pl['name']) ?><?= $pl['address'] ? ' (' . htmlspecialchars($pl['address']) . ')' : '' ?>
                             </option>
                         <?php endforeach; ?>
@@ -239,15 +239,20 @@ require_once __DIR__ . '/includes/header.php';
                 </div>
             </div>
 
-            <div id="selectedPlaceNotice" class="hidden text-xs text-emerald-800 bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-200 flex items-center justify-between">
-                <div class="flex items-center space-x-1.5 truncate">
+            <div id="selectedPlaceNotice" class="hidden text-xs text-emerald-800 bg-emerald-50 px-3.5 py-2.5 rounded-xl border border-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div class="flex items-center space-x-2 truncate">
                     <svg class="w-4 h-4 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
                     </svg>
                     <span id="selectedPlaceLabel" class="font-bold truncate"></span>
                 </div>
-                <span class="text-[11px] text-emerald-600 font-semibold whitespace-nowrap ml-2">Đã ưu tiên các món của quán lên đầu danh sách</span>
+                <div class="flex items-center space-x-2 flex-shrink-0">
+                    <a id="selectedPlaceMapLink" href="#" target="_blank" rel="noopener noreferrer" class="hidden inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 transition shadow-2xs">
+                        🗺️ Google Maps ↗
+                    </a>
+                    <span class="text-[11px] text-emerald-600 font-semibold whitespace-nowrap">Ưu tiên món quán lên đầu</span>
+                </div>
             </div>
         </div>
 
@@ -300,6 +305,10 @@ require_once __DIR__ . '/includes/header.php';
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Địa Chỉ / Vị Trí</label>
                 <input type="text" id="quickPlaceAddress" placeholder="Ví dụ: đường Mai Chí Thọ, Quận 2" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm">
             </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Link Google Maps <span class="text-slate-400 font-normal normal-case">(Tùy chọn)</span></label>
+                <input type="url" id="quickPlaceMapUrl" placeholder="https://maps.app.goo.gl/... hoặc https://google.com/maps/..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm">
+            </div>
             <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button type="button" onclick="closeQuickPlaceModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
                 <button type="submit" id="quickPlaceSubmitBtn" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-md">Tạo & Chọn Quán</button>
@@ -349,18 +358,28 @@ function onPlaceChange(placeId) {
     const selectedOption = placeSelect.options[placeSelect.selectedIndex];
     const placeName = selectedOption ? (selectedOption.getAttribute('data-name') || '') : '';
     const placeAddress = selectedOption ? (selectedOption.getAttribute('data-address') || '') : '';
+    const mapUrl = selectedOption ? (selectedOption.getAttribute('data-map-url') || '') : '';
 
     const btnWrap = document.getElementById('addProdForPlaceBtnWrap');
     const notice = document.getElementById('selectedPlaceNotice');
     const label = document.getElementById('selectedPlaceLabel');
+    const mapLink = document.getElementById('selectedPlaceMapLink');
 
     if (selectedPlaceId > 0) {
         btnWrap.style.display = 'block';
         notice.classList.remove('hidden');
         label.textContent = placeName + (placeAddress ? ' — ' + placeAddress : '');
+
+        if (mapUrl) {
+            mapLink.href = mapUrl;
+            mapLink.classList.remove('hidden');
+        } else {
+            mapLink.classList.add('hidden');
+        }
     } else {
         btnWrap.style.display = 'none';
         notice.classList.add('hidden');
+        if (mapLink) mapLink.classList.add('hidden');
     }
 
     refreshAllProductSelects();
@@ -538,6 +557,7 @@ function toggleAllMembers(idx, isChecked) {
 function openQuickPlaceModal() {
     document.getElementById('quickPlaceName').value = '';
     document.getElementById('quickPlaceAddress').value = '';
+    document.getElementById('quickPlaceMapUrl').value = '';
     document.getElementById('quickPlaceModal').classList.remove('hidden');
     document.getElementById('quickPlaceName').focus();
 }
@@ -550,6 +570,7 @@ async function handleQuickPlaceSubmit(e) {
     e.preventDefault();
     const name = document.getElementById('quickPlaceName').value.trim();
     const address = document.getElementById('quickPlaceAddress').value.trim();
+    const mapUrl = document.getElementById('quickPlaceMapUrl').value.trim();
     const btn = document.getElementById('quickPlaceSubmitBtn');
 
     if (!name) return;
@@ -561,6 +582,7 @@ async function handleQuickPlaceSubmit(e) {
         formData.append('action', 'quick_place_create');
         formData.append('place_name', name);
         formData.append('place_address', address);
+        formData.append('map_url', mapUrl);
 
         const res = await fetch('ajax_action.php', { method: 'POST', body: formData });
         const data = await res.json();
@@ -572,6 +594,7 @@ async function handleQuickPlaceSubmit(e) {
             opt.value = place.id;
             opt.setAttribute('data-name', place.name);
             opt.setAttribute('data-address', place.address || '');
+            opt.setAttribute('data-map-url', place.map_url || '');
             opt.textContent = `📍 ${place.name}` + (place.address ? ` (${place.address})` : '');
             opt.selected = true;
             placeSelect.appendChild(opt);

@@ -61,6 +61,7 @@ $pdo->exec("
         `group_id` INTEGER NOT NULL DEFAULT 1,
         `name` TEXT NOT NULL,
         `address` TEXT,
+        `map_url` TEXT DEFAULT NULL,
         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
     );
     CREATE TABLE IF NOT EXISTS `products` (
@@ -75,6 +76,7 @@ $pdo->exec("
     CREATE TABLE IF NOT EXISTS `transactions` (
         `id` INTEGER PRIMARY KEY AUTOINCREMENT,
         `group_id` INTEGER NOT NULL DEFAULT 1,
+        `place_id` INTEGER DEFAULT NULL,
         `title` TEXT NOT NULL,
         `payer_id` INTEGER NOT NULL,
         `total_amount` REAL NOT NULL DEFAULT 0.00,
@@ -423,6 +425,28 @@ assert(count($txUpdated['items']) === 1);
 assert((int)$txUpdated['items'][0]['product_id'] === (int)$prod2['id']);
 assert(count($txUpdated['items'][0]['members']) === 3);
 echo "✓ Transaction::update sửa toàn bộ giao dịch (quán, người trả, món, thành viên) thành công\n";
+
+// Test 9.3: Place with Google Maps URL
+$placeWithMap = $placeModel->create('Quán Cafe View Đẹp', '123 Nguyễn Huệ', $gid, 'https://maps.app.goo.gl/example123');
+assert($placeWithMap['map_url'] === 'https://maps.app.goo.gl/example123');
+
+$placeModel->update((int)$placeWithMap['id'], ['map_url' => 'https://maps.app.goo.gl/updated456']);
+$checkPlace = $placeModel->find((int)$placeWithMap['id']);
+assert($checkPlace['map_url'] === 'https://maps.app.goo.gl/updated456');
+
+// Gán quán này vào transaction và kiểm tra place_map_url
+$txMapTest = $txModel->create('Hẹn hò cafe', $m1['id'], [
+    [
+        'product_id' => $prod1['id'],
+        'price' => 35000,
+        'quantity' => 1,
+        'member_ids' => [$m1['id']]
+    ]
+], 'completed', null, $gid, null, null, (int)$placeWithMap['id']);
+
+$txFound = $txModel->find((int)$txMapTest['id']);
+assert($txFound['place_map_url'] === 'https://maps.app.goo.gl/updated456');
+echo "✓ Place map_url (Google Maps link) lưu trữ, cập nhật và hiển thị trong transaction thành công\n";
 
 echo "\n>>> TẤT CẢ CÁC BÀI TEST ĐÃ VƯỢT QUA XUẤT SẮC! <<<\n";
 

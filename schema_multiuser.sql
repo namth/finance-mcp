@@ -117,10 +117,30 @@ CREATE TABLE IF NOT EXISTS `places` (
     `group_id` INT UNSIGNED NOT NULL DEFAULT 1,
     `name` VARCHAR(150) NOT NULL,
     `address` VARCHAR(255) DEFAULT NULL,
+    `map_url` TEXT DEFAULT NULL,
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     INDEX (`group_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Thêm cột map_url vào places nếu chưa có
+SET @tablename = "places";
+SET @columnname = "map_url";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `places` ADD COLUMN `map_url` TEXT DEFAULT NULL AFTER `address`;"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- Thêm cột place_id vào products nếu chưa có
 SET @tablename = "products";
 SET @columnname = "place_id";
 SET @preparedStatement = (SELECT IF(
@@ -133,6 +153,24 @@ SET @preparedStatement = (SELECT IF(
   ) > 0,
   "SELECT 1",
   "ALTER TABLE `products` ADD COLUMN `place_id` INT UNSIGNED DEFAULT NULL AFTER `group_id`;"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- Thêm cột place_id vào transactions nếu chưa có
+SET @tablename = "transactions";
+SET @columnname = "place_id";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `transactions` ADD COLUMN `place_id` INT UNSIGNED DEFAULT NULL AFTER `group_id`;"
 ));
 PREPARE alterIfNotExists FROM @preparedStatement;
 EXECUTE alterIfNotExists;

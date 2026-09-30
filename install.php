@@ -189,6 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `group_id` INT UNSIGNED NOT NULL DEFAULT 1,
             `name` VARCHAR(150) NOT NULL,
             `address` VARCHAR(255) DEFAULT NULL,
+            `map_url` TEXT DEFAULT NULL,
             `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
             INDEX (`group_id`)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -208,6 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         CREATE TABLE IF NOT EXISTS `transactions` (
             `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             `group_id` INT UNSIGNED NOT NULL DEFAULT 1,
+            `place_id` INT UNSIGNED DEFAULT NULL,
             `title` VARCHAR(255) NOT NULL,
             `payer_id` INT UNSIGNED NOT NULL,
             `total_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
@@ -216,6 +218,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
             `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX (`group_id`),
+            INDEX (`place_id`),
             FOREIGN KEY (`payer_id`) REFERENCES `members`(`id`) ON DELETE RESTRICT
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

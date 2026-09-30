@@ -248,7 +248,7 @@ class Transaction
     {
         $sql = "
             SELECT t.*, m.name AS payer_name, m.phone AS payer_phone,
-                   pl.name AS place_name, pl.address AS place_address
+                   pl.name AS place_name, pl.address AS place_address, pl.map_url AS place_map_url
             FROM `transactions` t
             JOIN `members` m ON t.payer_id = m.id
             LEFT JOIN `places` pl ON t.place_id = pl.id
@@ -281,7 +281,7 @@ class Transaction
     {
         $stmt = $this->db->prepare("
             SELECT t.*, m.name AS payer_name, m.phone AS payer_phone, m.email AS payer_email,
-                   pl.name AS place_name, pl.address AS place_address
+                   pl.name AS place_name, pl.address AS place_address, pl.map_url AS place_map_url
             FROM `transactions` t
             JOIN `members` m ON t.payer_id = m.id
             LEFT JOIN `places` pl ON t.place_id = pl.id
@@ -297,7 +297,7 @@ class Transaction
         // Lấy danh sách items kèm thông tin Quán / Địa điểm nếu có
         $stmtItems = $this->db->prepare("
             SELECT ti.*, p.name AS product_name, p.description AS product_description,
-                   pl.name AS place_name, pl.address AS place_address
+                   pl.name AS place_name, pl.address AS place_address, pl.map_url AS place_map_url
             FROM `transaction_items` ti
             JOIN `products` p ON ti.product_id = p.id
             LEFT JOIN `places` pl ON p.place_id = pl.id

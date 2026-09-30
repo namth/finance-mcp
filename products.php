@@ -31,12 +31,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($action === 'place_create') {
             $placeName = trim((string)($_POST['place_name'] ?? ''));
             $placeAddress = trim((string)($_POST['place_address'] ?? ''));
+            $mapUrl = trim((string)($_POST['place_map_url'] ?? ($_POST['map_url'] ?? '')));
 
             if (empty($placeName)) {
                 throw new \InvalidArgumentException("Vui lòng nhập tên quán / địa điểm.");
             }
 
-            $newPlace = $placeModel->create($placeName, $placeAddress ?: null, $currentGroupId);
+            $newPlace = $placeModel->create($placeName, $placeAddress ?: null, $currentGroupId, $mapUrl ?: null);
 
             // Nếu gọi qua AJAX (từ nút Thêm quán nhanh trong form sản phẩm)
             if (!empty($_POST['is_ajax'])) {
@@ -53,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $placeId = (int)($_POST['place_id'] ?? 0);
             $placeName = trim((string)($_POST['place_name'] ?? ''));
             $placeAddress = trim((string)($_POST['place_address'] ?? ''));
+            $mapUrl = trim((string)($_POST['place_map_url'] ?? ($_POST['map_url'] ?? '')));
 
             if (empty($placeName)) {
                 throw new \InvalidArgumentException("Tên quán không được để trống.");
@@ -61,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $placeModel->update($placeId, [
                 'name'    => $placeName,
                 'address' => $placeAddress ?: null,
+                'map_url' => $mapUrl ?: null,
             ]);
             $flashSuccess = "Đã cập nhật thông tin quán thành công!";
         } elseif ($action === 'place_delete') {
@@ -362,6 +365,11 @@ require_once __DIR__ . '/includes/header.php';
                 <input type="text" id="quickPlaceAddress" placeholder="Ví dụ: 123 Lê Lợi, Quận 1..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
 
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Link Google Maps <span class="text-slate-400 font-normal normal-case">(Tùy chọn)</span></label>
+                <input type="url" id="quickPlaceMapUrl" placeholder="https://maps.app.goo.gl/... hoặc https://google.com/maps/..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+            </div>
+
             <div class="pt-2 flex justify-end space-x-2.5">
                 <button type="button" onclick="closeQuickAddPlaceModal()" class="px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
                     Hủy
@@ -404,11 +412,14 @@ require_once __DIR__ . '/includes/header.php';
                 <input type="hidden" name="action" id="actionPlaceForm" value="place_create">
                 <input type="hidden" name="place_id" id="editPlaceId" value="">
 
-                <div class="sm:col-span-5">
+                <div class="sm:col-span-4">
                     <input type="text" name="place_name" id="editPlaceName" required placeholder="Tên quán (bắt buộc)..." class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
-                <div class="sm:col-span-5">
+                <div class="sm:col-span-3">
                     <input type="text" name="place_address" id="editPlaceAddress" placeholder="Địa chỉ (ví dụ: 123 Lê Lợi)..." class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
+                </div>
+                <div class="sm:col-span-3">
+                    <input type="url" name="place_map_url" id="editPlaceMapUrl" placeholder="Link Google Maps..." class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500">
                 </div>
                 <div class="sm:col-span-2 flex items-center space-x-1">
                     <button type="submit" id="btnSubmitPlaceForm" class="w-full py-1.5 px-3 text-xs font-bold rounded-lg text-white bg-emerald-600 hover:bg-emerald-700 transition">
@@ -433,6 +444,7 @@ require_once __DIR__ . '/includes/header.php';
                         <tr>
                             <th class="px-4 py-2.5 text-left">Tên Quán</th>
                             <th class="px-4 py-2.5 text-left">Địa Chỉ</th>
+                            <th class="px-4 py-2.5 text-left">Bản Đồ</th>
                             <th class="px-4 py-2.5 text-right">Thao Tác</th>
                         </tr>
                     </thead>
@@ -445,9 +457,18 @@ require_once __DIR__ . '/includes/header.php';
                                 <td class="px-4 py-3 text-slate-500">
                                     <?= htmlspecialchars($pl['address'] ?: '—') ?>
                                 </td>
+                                <td class="px-4 py-3 whitespace-nowrap text-slate-500">
+                                    <?php if (!empty($pl['map_url'])): ?>
+                                        <a href="<?= htmlspecialchars($pl['map_url']) ?>" target="_blank" rel="noopener noreferrer" class="inline-flex items-center text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline">
+                                            🗺️ Mở map ↗
+                                        </a>
+                                    <?php else: ?>
+                                        <span class="text-slate-300">—</span>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="px-4 py-3 whitespace-nowrap text-right space-x-1">
                                     <button type="button" 
-                                            onclick="editPlaceRow(<?= $pl['id'] ?>, '<?= htmlspecialchars(addslashes($pl['name'])) ?>', '<?= htmlspecialchars(addslashes($pl['address'] ?? '')) ?>')"
+                                            onclick="editPlaceRow(<?= $pl['id'] ?>, '<?= htmlspecialchars(addslashes($pl['name'])) ?>', '<?= htmlspecialchars(addslashes($pl['address'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($pl['map_url'] ?? '')) ?>')"
                                             class="px-2 py-1 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 rounded transition border border-slate-200">
                                         Sửa
                                     </button>
@@ -524,6 +545,7 @@ function openQuickAddPlaceModal() {
     document.getElementById('quickPlaceError').classList.add('hidden');
     document.getElementById('quickPlaceName').value = '';
     document.getElementById('quickPlaceAddress').value = '';
+    document.getElementById('quickPlaceMapUrl').value = '';
     document.getElementById('quickAddPlaceModal').classList.remove('hidden');
 }
 
@@ -535,11 +557,13 @@ async function handleQuickPlaceSubmit(e) {
     e.preventDefault();
     const nameInput = document.getElementById('quickPlaceName');
     const addressInput = document.getElementById('quickPlaceAddress');
+    const mapUrlInput = document.getElementById('quickPlaceMapUrl');
     const btn = document.getElementById('btnSaveQuickPlace');
     const errBox = document.getElementById('quickPlaceError');
 
     const name = nameInput.value.trim();
     const address = addressInput.value.trim();
+    const mapUrl = mapUrlInput ? mapUrlInput.value.trim() : '';
 
     if (!name) return;
 
@@ -553,6 +577,7 @@ async function handleQuickPlaceSubmit(e) {
         formData.append('is_ajax', '1');
         formData.append('place_name', name);
         formData.append('place_address', address);
+        formData.append('place_map_url', mapUrl);
 
         const res = await fetch('products.php', {
             method: 'POST',
@@ -569,6 +594,7 @@ async function handleQuickPlaceSubmit(e) {
             const opt = document.createElement('option');
             opt.value = data.place.id;
             opt.setAttribute('data-address', data.place.address || '');
+            opt.setAttribute('data-map-url', data.place.map_url || '');
             opt.textContent = data.place.name + (data.place.address ? ` (${data.place.address})` : '');
             select.appendChild(opt);
             select.value = data.place.id;
@@ -597,12 +623,13 @@ function closeManagePlacesModal() {
     document.getElementById('managePlacesModal').classList.add('hidden');
 }
 
-function editPlaceRow(id, name, address) {
+function editPlaceRow(id, name, address, mapUrl = '') {
     document.getElementById('placeFormTitle').textContent = 'Sửa Thông Tin Quán #' + id;
     document.getElementById('actionPlaceForm').value = 'place_update';
     document.getElementById('editPlaceId').value = id;
     document.getElementById('editPlaceName').value = name;
     document.getElementById('editPlaceAddress').value = address;
+    document.getElementById('editPlaceMapUrl').value = mapUrl;
     document.getElementById('btnSubmitPlaceForm').textContent = 'Cập nhật';
     document.getElementById('btnCancelEditPlace').classList.remove('hidden');
 }
@@ -613,6 +640,7 @@ function resetPlaceForm() {
     document.getElementById('editPlaceId').value = '';
     document.getElementById('editPlaceName').value = '';
     document.getElementById('editPlaceAddress').value = '';
+    document.getElementById('editPlaceMapUrl').value = '';
     document.getElementById('btnSubmitPlaceForm').textContent = 'Lưu';
     document.getElementById('btnCancelEditPlace').classList.add('hidden');
 }

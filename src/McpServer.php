@@ -230,9 +230,11 @@ class McpServer
                     $items = (array)($args['items'] ?? []);
                     $status = (string)($args['status'] ?? 'completed');
                     $note = isset($args['note']) ? (string)$args['note'] : null;
+                    $placeName = isset($args['place_name']) ? (string)$args['place_name'] : null;
+                    $placeAddress = isset($args['place_address']) ? (string)$args['place_address'] : null;
                     $groupId = $this->getEffectiveGroupId($args);
 
-                    $tx = $txModel->create($title, $payerId, $items, $status, $note, $groupId);
+                    $tx = $txModel->create($title, $payerId, $items, $status, $note, $groupId, $placeName, $placeAddress);
 
                     if ($status === 'completed') {
                         $debtManager->processTransaction((int)$tx['id']);
@@ -242,6 +244,67 @@ class McpServer
                         'transaction'   => $tx,
                         'group_id'      => $groupId,
                         'debts_updated' => ($status === 'completed'),
+                    ];
+                })(),
+
+                'transaction_update' => (function () use ($txModel, $debtManager, $args) {
+                    $id = (int)($args['id'] ?? 0);
+                    $groupId = $this->getEffectiveGroupId($args);
+
+                    $oldTx = $txModel->find($id);
+                    if (!$oldTx) {
+                        throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$id}");
+                    }
+                    if ((int)$oldTx['group_id'] !== $groupId) {
+                        throw new \InvalidArgumentException("Giao dịch #{$id} không thuộc nhóm chi tiêu của bạn.");
+                    }
+
+                    $updatedTx = $txModel->update($id, $args, $groupId);
+                    if (!$updatedTx) {
+                        throw new \InvalidArgumentException("Không thể cập nhật giao dịch #{$id}.");
+                    }
+
+                    // Tự động tính toán lại công nợ nhóm nếu giao dịch trước đó hoặc sau khi sửa ở trạng thái 'completed'
+                    $debtsRecalculated = false;
+                    if ($oldTx['status'] === 'completed' || $updatedTx['status'] === 'completed') {
+                        $debtManager->recalculateAll($groupId);
+                        $debtsRecalculated = true;
+                    }
+
+                    return [
+                        'transaction'        => $updatedTx,
+                        'group_id'           => $groupId,
+                        'debts_recalculated' => $debtsRecalculated,
+                        'message'            => "Đã cập nhật giao dịch #{$id} thành công" . ($debtsRecalculated ? " và tự động tính toán lại công nợ của nhóm." : "."),
+                    ];
+                })(),
+
+                'transaction_delete' => (function () use ($txModel, $debtManager, $args) {
+                    $id = (int)($args['id'] ?? 0);
+                    $groupId = $this->getEffectiveGroupId($args);
+
+                    $oldTx = $txModel->find($id);
+                    if (!$oldTx) {
+                        throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$id}");
+                    }
+                    if ((int)$oldTx['group_id'] !== $groupId) {
+                        throw new \InvalidArgumentException("Giao dịch #{$id} không thuộc nhóm chi tiêu của bạn.");
+                    }
+
+                    $wasCompleted = ($oldTx['status'] === 'completed');
+                    $ok = $txModel->delete($id, $groupId);
+
+                    $debtsRecalculated = false;
+                    if ($ok && $wasCompleted) {
+                        $debtManager->recalculateAll($groupId);
+                        $debtsRecalculated = true;
+                    }
+
+                    return [
+                        'success'            => $ok,
+                        'group_id'           => $groupId,
+                        'debts_recalculated' => $debtsRecalculated,
+                        'message'            => "Đã xóa giao dịch #{$id}" . ($debtsRecalculated ? " và tự động điều chỉnh lại toàn bộ bảng công nợ." : "."),
                     ];
                 })(),
 
@@ -505,41 +568,110 @@ class McpServer
             // Transactions
             'transaction_create' => [
                 'name' => 'transaction_create',
-                'description' => 'Tạo giao dịch chi tiêu mới gồm nhiều sản phẩm/dịch vụ, chỉ định người thanh toán và phân bổ thành viên tham gia từng món theo nhóm.',
+                'description' => 'Tạo giao dịch chi tiêu mới gồm nhiều sản phẩm/dịch vụ, hỗ trợ nhận diện món ăn/đồ uống theo tên hoặc ID, ưu tiên khớp theo vị trí quán/địa điểm (nếu chưa có trong danh mục sẽ tự động thêm mới), lấy giá mặc định hoặc giá tùy chỉnh, chỉ định người thanh toán và phân chia cho các thành viên.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'title'    => ['type' => 'string', 'description' => 'Tiêu đề giao dịch'],
-                        'payer_id' => ['type' => 'integer', 'description' => 'ID của thành viên đứng ra thanh toán toàn bộ hóa đơn'],
-                        'group_id' => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn, mặc định là nhóm chính)'],
-                        'status'   => [
+                        'title'         => ['type' => 'string', 'description' => 'Tiêu đề giao dịch (ví dụ: Ăn trưa Highlands, Cafe sáng)'],
+                        'payer_id'      => ['type' => 'integer', 'description' => 'ID của thành viên đứng ra thanh toán toàn bộ hóa đơn'],
+                        'group_id'      => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn, mặc định là nhóm chính của user)'],
+                        'place_name'    => ['type' => 'string', 'description' => 'Tên quán/địa điểm chung của giao dịch (ví dụ: The Coffee House, Highlands Coffee, Phở Thìn)'],
+                        'place_address' => ['type' => 'string', 'description' => 'Địa chỉ hoặc vị trí của quán (ví dụ: đường Mai Chí Thọ, Quận 2)'],
+                        'status'        => [
                             'type'        => 'string',
                             'enum'        => ['draft', 'completed'],
                             'description' => 'Trạng thái giao dịch. Mặc định là "completed" (tính nợ ngay)',
                             'default'     => 'completed',
                         ],
-                        'note'     => ['type' => 'string', 'description' => 'Ghi chú thêm về giao dịch'],
-                        'items'    => [
+                        'note'          => ['type' => 'string', 'description' => 'Ghi chú thêm về giao dịch'],
+                        'items'         => [
                             'type'        => 'array',
                             'description' => 'Danh sách sản phẩm/dịch vụ trong hóa đơn',
                             'items'       => [
                                 'type'       => 'object',
                                 'properties' => [
-                                    'product_id' => ['type' => 'integer', 'description' => 'ID sản phẩm/dịch vụ'],
-                                    'price'      => ['type' => 'number', 'description' => 'Giá thực tế cho lần dùng này'],
-                                    'quantity'   => ['type' => 'integer', 'description' => 'Số lượng (mặc định 1)', 'default' => 1],
-                                    'note'       => ['type' => 'string', 'description' => 'Ghi chú cho món này'],
-                                    'member_ids' => [
+                                    'product_id'    => ['type' => 'integer', 'description' => 'ID sản phẩm nếu đã có (tùy chọn nếu đã truyền product_name)'],
+                                    'product_name'  => ['type' => 'string', 'description' => 'Tên sản phẩm/dịch vụ (nếu chưa có trong hệ thống, sẽ tự động thêm mới vào danh mục)'],
+                                    'price'         => ['type' => 'number', 'description' => 'Giá thực tế cho lần dùng này. Nếu để trống sẽ tự lấy theo giá mặc định của sản phẩm trong danh mục.'],
+                                    'quantity'      => ['type' => 'integer', 'description' => 'Số lượng (mặc định 1)', 'default' => 1],
+                                    'note'          => ['type' => 'string', 'description' => 'Ghi chú cho món này'],
+                                    'place_name'    => ['type' => 'string', 'description' => 'Tên quán cho món này (nếu khác tên quán chung)'],
+                                    'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán cho món này (nếu khác địa chỉ chung)'],
+                                    'member_ids'    => [
                                         'type'        => 'array',
                                         'description' => 'Danh sách ID các thành viên cùng sử dụng',
                                         'items'       => ['type' => 'integer'],
                                     ],
+                                    'shares'        => [
+                                        'type'        => 'object',
+                                        'description' => 'Phân chia tiền chi tiết theo thành viên {member_id: amount}. Nếu để trống sẽ tự động chia đều.',
+                                    ],
                                 ],
-                                'required' => ['product_id', 'member_ids'],
+                                'required' => ['member_ids'],
                             ],
                         ],
                     ],
                     'required' => ['title', 'payer_id', 'items'],
+                ],
+            ],
+            'transaction_update' => [
+                'name' => 'transaction_update',
+                'description' => 'Cập nhật hoặc sửa thông tin giao dịch (đổi giá sản phẩm, sửa người trả tiền, thay đổi danh sách món, phân chia lại tiền người tham gia, đổi trạng thái). Hệ thống sẽ tự động tính toán lại toàn bộ bảng công nợ của nhóm.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id'            => ['type' => 'integer', 'description' => 'ID giao dịch cần cập nhật'],
+                        'title'         => ['type' => 'string', 'description' => 'Tiêu đề giao dịch mới (tùy chọn)'],
+                        'payer_id'      => ['type' => 'integer', 'description' => 'ID người thanh toán mới (tùy chọn)'],
+                        'group_id'      => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                        'place_name'    => ['type' => 'string', 'description' => 'Tên quán/địa điểm mới (tùy chọn)'],
+                        'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán mới (tùy chọn)'],
+                        'status'        => [
+                            'type'        => 'string',
+                            'enum'        => ['draft', 'completed', 'cancelled'],
+                            'description' => 'Trạng thái giao dịch mới (tùy chọn)',
+                        ],
+                        'note'          => ['type' => 'string', 'description' => 'Ghi chú mới (tùy chọn)'],
+                        'items'         => [
+                            'type'        => 'array',
+                            'description' => 'Danh sách món mới thay thế toàn bộ danh sách cũ (tùy chọn)',
+                            'items'       => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'product_id'    => ['type' => 'integer', 'description' => 'ID sản phẩm (tùy chọn nếu có product_name)'],
+                                    'product_name'  => ['type' => 'string', 'description' => 'Tên món (tùy chọn nếu có product_id)'],
+                                    'price'         => ['type' => 'number', 'description' => 'Giá món. Nếu để trống sẽ lấy giá mặc định trong danh mục'],
+                                    'quantity'      => ['type' => 'integer', 'description' => 'Số lượng (mặc định 1)', 'default' => 1],
+                                    'note'          => ['type' => 'string', 'description' => 'Ghi chú cho món'],
+                                    'place_name'    => ['type' => 'string', 'description' => 'Tên quán cho món này'],
+                                    'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán cho món này'],
+                                    'member_ids'    => [
+                                        'type'        => 'array',
+                                        'description' => 'Danh sách ID các thành viên cùng sử dụng',
+                                        'items'       => ['type' => 'integer'],
+                                    ],
+                                    'shares'        => [
+                                        'type'        => 'object',
+                                        'description' => 'Phân chia tiền chi tiết theo thành viên {member_id: amount}',
+                                    ],
+                                ],
+                                'required' => ['member_ids'],
+                            ],
+                        ],
+                    ],
+                    'required' => ['id'],
+                ],
+            ],
+            'transaction_delete' => [
+                'name' => 'transaction_delete',
+                'description' => 'Xóa một giao dịch khỏi hệ thống. Nếu giao dịch đã hoàn thành và tính nợ, hệ thống sẽ tự động tính toán và điều chỉnh lại toàn bộ bảng công nợ của nhóm.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id'       => ['type' => 'integer', 'description' => 'ID giao dịch cần xóa'],
+                        'group_id' => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                    ],
+                    'required' => ['id'],
                 ],
             ],
             'transaction_list' => [

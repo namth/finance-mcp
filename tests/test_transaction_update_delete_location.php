@@ -361,4 +361,68 @@ assert(count($dataFilter['products']) === 1);
 assert($dataFilter['products'][0]['name'] === 'Bạc xỉu đặc biệt');
 echo "✓ product_list kết hợp lọc quán và tên sản phẩm thành công\n";
 
+// --- TEST 9: UPDATE ITEM PRICE & FULL TRANSACTION EDIT ---
+echo "\n--- TEST 9: UPDATE ITEM PRICE & FULL TRANSACTION EDIT ---\n";
+// Tạo 1 transaction mới
+$txNew = $txModel->create(
+    "Test Edit Transaction",
+    $m1['id'],
+    [
+        [
+            'product_id' => $prod1['id'],
+            'price' => 30000,
+            'quantity' => 2,
+            'member_ids' => [$m1['id'], $m2['id']]
+        ]
+    ],
+    'completed',
+    'Ghi chú test',
+    $gid,
+    null,
+    null,
+    $place1['id']
+);
+$txNewId = (int)$txNew['id'];
+$debtManager->processTransaction($txNewId);
+
+// Test 9.1: updateItemPrice
+$createdTx = $txModel->find($txNewId);
+$itemId = (int)$createdTx['items'][0]['id'];
+$txModel->updateItemPrice($txNewId, $itemId, 35000, 3); // 35k * 3 = 105k
+$debtManager->recalculateAll($gid);
+
+$txAfterPriceUpdate = $txModel->find($txNewId);
+assert((float)$txAfterPriceUpdate['total_amount'] === 105000.0, "Tổng tiền sau updateItemPrice phải là 105,000");
+assert((float)$txAfterPriceUpdate['items'][0]['price'] === 35000.0);
+assert((int)$txAfterPriceUpdate['items'][0]['quantity'] === 3);
+echo "✓ updateItemPrice hoạt động chính xác (tổng tiền 105,000đ, chia lại cho thành viên)\n";
+
+// Test 9.2: Full transaction edit with new place & items
+$txUpdated = $txModel->update($txNewId, [
+    'title' => 'Đã sửa toàn bộ giao dịch',
+    'payer_id' => $m2['id'],
+    'place_id' => $place2['id'],
+    'status' => 'completed',
+    'items' => [
+        [
+            'product_id' => $prod2['id'],
+            'price' => 45000,
+            'quantity' => 1,
+            'member_ids' => [$m1['id'], $m2['id'], $m3['id']],
+            'note' => 'Món mới sửa'
+        ]
+    ]
+], $gid);
+$debtManager->recalculateAll($gid);
+
+assert($txUpdated['title'] === 'Đã sửa toàn bộ giao dịch');
+assert((int)$txUpdated['payer_id'] === (int)$m2['id']);
+assert((int)$txUpdated['place_id'] === (int)$place2['id']);
+assert((float)$txUpdated['total_amount'] === 45000.0);
+assert(count($txUpdated['items']) === 1);
+assert((int)$txUpdated['items'][0]['product_id'] === (int)$prod2['id']);
+assert(count($txUpdated['items'][0]['members']) === 3);
+echo "✓ Transaction::update sửa toàn bộ giao dịch (quán, người trả, món, thành viên) thành công\n";
+
 echo "\n>>> TẤT CẢ CÁC BÀI TEST ĐÃ VƯỢT QUA XUẤT SẮC! <<<\n";
+

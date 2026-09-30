@@ -25,13 +25,31 @@ if (!$tx) {
     die("Không tìm thấy giao dịch với ID: {$id}");
 }
 
-$flashSuccess = isset($_GET['created']) ? 'Đã tạo giao dịch và tự động cập nhật công nợ thành công!' : '';
+$flashSuccess = isset($_GET['created']) ? 'Đã tạo giao dịch và tự động cập nhật công nợ thành công!' : (isset($_GET['updated']) ? 'Đã cập nhật thông tin giao dịch thành công!' : '');
+$flashError = '';
 
 // Xử lý xác nhận hoàn thành giao dịch (nếu trước đó là draft)
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'complete') {
-    $tx = $txModel->updateStatus($id, 'completed');
-    $debtManager->processTransaction($id);
-    $flashSuccess = 'Đã xác nhận hoàn thành giao dịch và cập nhật vào bảng công nợ!';
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
+    if ($_POST['action'] === 'complete') {
+        $tx = $txModel->updateStatus($id, 'completed');
+        $debtManager->processTransaction($id);
+        $flashSuccess = 'Đã xác nhận hoàn thành giao dịch và cập nhật vào bảng công nợ!';
+    } elseif ($_POST['action'] === 'update_item_price') {
+        $itemId = (int)($_POST['item_id'] ?? 0);
+        $newPrice = (float)($_POST['new_price'] ?? 0);
+        $newQty = isset($_POST['new_quantity']) && (int)$_POST['new_quantity'] > 0 ? (int)$_POST['new_quantity'] : null;
+
+        try {
+            $txModel->updateItemPrice($id, $itemId, $newPrice, $newQty);
+            if ($tx['status'] === 'completed') {
+                $debtManager->recalculateAll((int)$tx['group_id']);
+            }
+            $flashSuccess = 'Đã sửa giá món và tự động tính toán lại bảng công nợ!';
+            $tx = $txModel->find($id); // nạp lại dữ liệu
+        } catch (\Throwable $e) {
+            $flashError = $e->getMessage();
+        }
+    }
 }
 
 // Tổng hợp tổng số tiền mỗi người phải chịu trong giao dịch này
@@ -55,33 +73,46 @@ require_once __DIR__ . '/includes/header.php';
 ?>
 
 <div class="max-w-4xl mx-auto mb-10">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
             <a href="transactions.php" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center mb-1">
                 &larr; Danh sách giao dịch
             </a>
             <div class="flex items-center space-x-3">
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Chi Tiết Hóa Đơn #<?= $tx['id'] ?>: <?= htmlspecialchars($tx['title']) ?></h1>
+                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Hóa Đơn #<?= $tx['id'] ?>: <?= htmlspecialchars($tx['title']) ?></h1>
                 <?php if ($tx['status'] === 'completed'): ?>
                     <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
                         Hoàn thành
                     </span>
-                <?php else: ?>
+                <?php elseif ($tx['status'] === 'draft'): ?>
                     <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
                         Bản nháp
+                    </span>
+                <?php else: ?>
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                        Đã hủy
                     </span>
                 <?php endif; ?>
             </div>
         </div>
 
-        <?php if ($tx['status'] === 'draft'): ?>
-            <form method="POST" action="transaction_detail.php?id=<?= $tx['id'] ?>">
-                <input type="hidden" name="action" value="complete">
-                <button type="submit" class="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition">
-                    Xác Nhận & Cập Nhật Nợ
-                </button>
-            </form>
-        <?php endif; ?>
+        <div class="flex items-center space-x-2">
+            <a href="transaction_edit.php?id=<?= $tx['id'] ?>" class="inline-flex items-center px-3.5 py-2 text-xs font-bold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-emerald-700 shadow-xs transition">
+                <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                </svg>
+                Sửa Toàn Bộ Giao Dịch
+            </a>
+
+            <?php if ($tx['status'] === 'draft'): ?>
+                <form method="POST" action="transaction_detail.php?id=<?= $tx['id'] ?>">
+                    <input type="hidden" name="action" value="complete">
+                    <button type="submit" class="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition">
+                        Xác Nhận & Cập Nhật Nợ
+                    </button>
+                </form>
+            <?php endif; ?>
+        </div>
     </div>
 
     <?php if ($flashSuccess): ?>
@@ -90,6 +121,15 @@ require_once __DIR__ . '/includes/header.php';
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
             </svg>
             <span class="font-medium"><?= htmlspecialchars($flashSuccess) ?></span>
+        </div>
+    <?php endif; ?>
+
+    <?php if ($flashError): ?>
+        <div class="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center space-x-2">
+            <svg class="w-5 h-5 text-rose-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            <span class="font-medium"><?= htmlspecialchars($flashError) ?></span>
         </div>
     <?php endif; ?>
 
@@ -111,8 +151,21 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <div>
-            <p class="text-xs font-semibold text-slate-400 uppercase">Thời Gian & Ghi Chú</p>
-            <p class="text-sm font-medium text-slate-700 mt-1"><?= htmlspecialchars($tx['created_at']) ?></p>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Địa Điểm & Ghi Chú</p>
+            <?php if (!empty($tx['place_name'])): ?>
+                <p class="text-sm font-bold text-emerald-800 mt-1 flex items-center">
+                    <svg class="w-4 h-4 mr-1 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span><?= htmlspecialchars($tx['place_name']) ?></span>
+                </p>
+                <?php if (!empty($tx['place_address'])): ?>
+                    <p class="text-xs text-slate-400"><?= htmlspecialchars($tx['place_address']) ?></p>
+                <?php endif; ?>
+            <?php else: ?>
+                <p class="text-sm font-medium text-slate-700 mt-1"><?= htmlspecialchars(substr($tx['created_at'], 0, 16)) ?></p>
+            <?php endif; ?>
             <p class="text-xs text-slate-500 mt-0.5"><?= htmlspecialchars($tx['note'] ?: 'Không có ghi chú thêm') ?></p>
         </div>
     </div>
@@ -145,9 +198,17 @@ require_once __DIR__ . '/includes/header.php';
                                         <?php endif; ?>
                                     </div>
                                 <?php endif; ?>
-                                <p class="text-xs text-slate-500 mt-0.5">
-                                    Đơn giá: <span class="font-semibold text-slate-700"><?= number_format($item['price']) ?> đ</span> &times; Số lượng: <span class="font-semibold text-slate-700"><?= $item['quantity'] ?></span>
-                                </p>
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <p class="text-xs text-slate-500">
+                                        Đơn giá: <span class="font-semibold text-slate-700"><?= number_format($item['price']) ?> đ</span> &times; Số lượng: <span class="font-semibold text-slate-700"><?= $item['quantity'] ?></span>
+                                    </p>
+                                    <button type="button" onclick="openEditItemPriceModal(<?= $item['id'] ?>, '<?= htmlspecialchars(addslashes($item['product_name'])) ?>', <?= $item['price'] ?>, <?= $item['quantity'] ?>)" class="inline-flex items-center text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded border border-emerald-200 transition">
+                                        <svg class="w-3 h-3 mr-1 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                        </svg>
+                                        Sửa giá
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -202,5 +263,61 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     </div>
 </div>
+
+<!-- Modal sửa giá nhanh cho món -->
+<div id="editPriceModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+                <h3 class="text-base font-bold text-slate-900" id="modalItemTitle">Sửa Giá Món</h3>
+                <p class="text-xs text-slate-400">Đổi giá hoặc số lượng cho món này</p>
+            </div>
+            <button type="button" onclick="closeEditPriceModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
+        </div>
+
+        <form method="POST" action="transaction_detail.php?id=<?= $tx['id'] ?>" id="editPriceForm" class="space-y-4">
+            <input type="hidden" name="action" value="update_item_price">
+            <input type="hidden" name="item_id" id="modalItemId" value="">
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Đơn Giá Mới (VNĐ) *</label>
+                <input type="number" name="new_price" id="modalNewPrice" required min="0" step="500" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-bold text-emerald-800">
+            </div>
+
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Số Lượng *</label>
+                <input type="number" name="new_quantity" id="modalNewQty" required min="1" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-semibold text-slate-800">
+            </div>
+
+            <p class="text-[11px] text-slate-400">
+                💡 Hệ thống sẽ tự động phân bổ lại số tiền chia đều cho các thành viên và cân bằng lại công nợ.
+            </p>
+
+            <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                <button type="button" onclick="closeEditPriceModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
+                    Hủy
+                </button>
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-md shadow-emerald-600/20">
+                    Lưu Thay Đổi
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditItemPriceModal(itemId, itemName, currentPrice, currentQty) {
+    document.getElementById('modalItemId').value = itemId;
+    document.getElementById('modalItemTitle').textContent = 'Sửa Giá: ' + itemName;
+    document.getElementById('modalNewPrice').value = currentPrice;
+    document.getElementById('modalNewQty').value = currentQty;
+    document.getElementById('editPriceModal').classList.remove('hidden');
+    document.getElementById('modalNewPrice').focus();
+}
+
+function closeEditPriceModal() {
+    document.getElementById('editPriceModal').classList.add('hidden');
+}
+</script>
 
 <?php require_once __DIR__ . '/includes/footer.php'; ?>

@@ -55,6 +55,22 @@ class Place
                         $this->db->exec("ALTER TABLE products ADD COLUMN place_id INTEGER DEFAULT NULL");
                     }
                 }
+
+                // Kiểm tra xem bảng transactions đã có cột place_id chưa
+                $stmtTx = $this->db->query("PRAGMA table_info(transactions)");
+                if ($stmtTx) {
+                    $cols = $stmtTx->fetchAll();
+                    $hasPlaceId = false;
+                    foreach ($cols as $c) {
+                        if (($c['name'] ?? '') === 'place_id') {
+                            $hasPlaceId = true;
+                            break;
+                        }
+                    }
+                    if (!$hasPlaceId) {
+                        $this->db->exec("ALTER TABLE transactions ADD COLUMN place_id INTEGER DEFAULT NULL");
+                    }
+                }
             } else {
                 // 1. Tạo bảng places nếu chưa có (MySQL)
                 $this->db->exec("
@@ -73,6 +89,13 @@ class Place
                 if (!$stmt->fetch()) {
                     $this->db->exec("ALTER TABLE `products` ADD COLUMN `place_id` INT UNSIGNED DEFAULT NULL AFTER `group_id`");
                     $this->db->exec("ALTER TABLE `products` ADD INDEX (`place_id`)");
+                }
+
+                // 3. Thêm cột place_id vào bảng transactions nếu chưa có
+                $stmtTx = $this->db->query("SHOW COLUMNS FROM `transactions` LIKE 'place_id'");
+                if (!$stmtTx->fetch()) {
+                    $this->db->exec("ALTER TABLE `transactions` ADD COLUMN `place_id` INT UNSIGNED DEFAULT NULL AFTER `group_id`");
+                    $this->db->exec("ALTER TABLE `transactions` ADD INDEX (`place_id`)");
                 }
             }
 

@@ -24,8 +24,13 @@ $statusFilter = isset($_GET['status']) && in_array($_GET['status'], ['completed'
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['action'] === 'delete') {
     $id = (int)($_POST['id'] ?? 0);
     try {
-        $txModel->delete($id);
-        $flashSuccess = "Đã xóa giao dịch #{$id} thành công!";
+        $targetTx = $txModel->find($id);
+        $wasCompleted = ($targetTx && $targetTx['status'] === 'completed');
+        $txModel->delete($id, (int)($_SESSION['current_group_id'] ?? 1));
+        if ($wasCompleted) {
+            (new \SimpleFinance\DebtManager())->recalculateAll((int)($_SESSION['current_group_id'] ?? 1));
+        }
+        $flashSuccess = "Đã xóa giao dịch #{$id} và tự động cân bằng lại công nợ!";
     } catch (\Throwable $e) {
         $flashError = $e->getMessage();
     }
@@ -149,6 +154,9 @@ require_once __DIR__ . '/includes/header.php';
                             <td class="px-6 py-4 whitespace-nowrap text-right space-x-2">
                                 <a href="transaction_detail.php?id=<?= $t['id'] ?>" class="px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg transition border border-slate-200 hover:border-emerald-300">
                                     Chi tiết
+                                </a>
+                                <a href="transaction_edit.php?id=<?= $t['id'] ?>" class="px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 rounded-lg transition border border-slate-200 hover:border-slate-300">
+                                    Sửa
                                 </a>
                                 <form method="POST" action="transactions.php" class="inline" onsubmit="return confirm('Bạn có chắc muốn xóa giao dịch này?');">
                                     <input type="hidden" name="action" value="delete">

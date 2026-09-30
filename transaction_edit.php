@@ -26,6 +26,14 @@ $debtManager = new DebtManager();
 
 $currentGroupId = (int)($_SESSION['current_group_id'] ?? 1);
 
+$id = (int)($_GET['id'] ?? ($_POST['id'] ?? 0));
+$tx = $txModel->find($id);
+
+if (!$tx || (int)$tx['group_id'] !== $currentGroupId) {
+    header("Location: transactions.php?error=" . urlencode("Không tìm thấy giao dịch hoặc bạn không có quyền chỉnh sửa."));
+    exit;
+}
+
 $members = $memberModel->all();
 $products = $productModel->all($currentGroupId);
 $places = $placeModel->all($currentGroupId);
@@ -79,46 +87,74 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new \InvalidArgumentException("Cần có ít nhất 1 món hợp lệ trong hóa đơn.");
         }
 
-        // Tạo giao dịch kèm place_id nếu có
-        $createdTx = $txModel->create($title, $payerId, $items, $status, $note ?: null, $currentGroupId, null, null, $placeId);
+        $oldStatus = $tx['status'];
 
-        // Tự động tính nợ nếu completed
-        if ($status === 'completed') {
-            $debtManager->processTransaction((int)$createdTx['id']);
+        $txModel->update($id, [
+            'title'    => $title,
+            'payer_id' => $payerId,
+            'place_id' => $placeId,
+            'status'   => $status,
+            'note'     => $note ?: null,
+            'items'    => $items,
+        ], $currentGroupId);
+
+        // Tính toán lại bảng nợ nếu giao dịch hoàn thành (hoặc từng hoàn thành)
+        if ($oldStatus === 'completed' || $status === 'completed') {
+            $debtManager->recalculateAll($currentGroupId);
         }
 
-        header("Location: transaction_detail.php?id=" . $createdTx['id'] . "&created=1");
+        header("Location: transaction_detail.php?id=" . $id . "&updated=1");
         exit;
     } catch (\Throwable $e) {
         $errorMessage = $e->getMessage();
     }
 }
 
-$pageTitle = "Tạo Giao Dịch Chi Tiêu Mới - SimpleFinance";
+// Chuẩn bị dữ liệu ban đầu cho các món hiện có
+$initialItems = [];
+foreach ($tx['items'] as $it) {
+    $memberIds = array_map(function($m) { return (int)$m['member_id']; }, $it['members'] ?? []);
+    $initialItems[] = [
+        'product_id' => (int)$it['product_id'],
+        'price'      => (float)$it['price'],
+        'quantity'   => (int)$it['quantity'],
+        'note'       => $it['note'] ?? '',
+        'member_ids' => $memberIds,
+    ];
+}
+
+$pageTitle = "Chỉnh Sửa Giao Dịch #" . $tx['id'] . " - SimpleFinance";
 require_once __DIR__ . '/includes/header.php';
 ?>
 
 <div class="max-w-4xl mx-auto mb-10">
     <div class="flex items-center justify-between mb-6">
         <div>
-            <a href="transactions.php" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center mb-1">
-                &larr; Quay lại danh sách
+            <a href="transaction_detail.php?id=<?= $tx['id'] ?>" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center mb-1">
+                &larr; Quay lại chi tiết giao dịch #<?= $tx['id'] ?>
             </a>
-            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Tạo Đợt Chi Tiêu / Hóa Đơn Mới</h1>
-            <p class="text-xs text-slate-500 mt-0.5">Chọn người thanh toán, địa điểm quán, các món và chọn thành viên cùng chia tiền</p>
+            <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Chỉnh Sửa Giao Dịch #<?= $tx['id'] ?></h1>
+            <p class="text-xs text-slate-500 mt-0.5">Cập nhật thông tin quán, người thanh toán, món ăn và chia tiền cho thành viên</p>
+        </div>
+        <div>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold <?= $tx['status'] === 'completed' ? 'bg-emerald-100 text-emerald-800' : ($tx['status'] === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800') ?>">
+                Trạng thái hiện tại: <?= $tx['status'] === 'completed' ? 'Hoàn thành' : ($tx['status'] === 'draft' ? 'Bản nháp' : 'Đã hủy') ?>
+            </span>
         </div>
     </div>
 
     <?php if ($errorMessage): ?>
         <div class="mb-6 p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-sm flex items-center space-x-2">
-            <svg class="w-5 h-5 text-rose-600" fill="currentColor" viewBox="0 0 20 20">
+            <svg class="w-5 h-5 text-rose-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
             </svg>
             <span class="font-medium"><?= htmlspecialchars($errorMessage) ?></span>
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="transaction_create.php" id="txForm" class="space-y-6">
+    <form method="POST" action="transaction_edit.php?id=<?= $tx['id'] ?>" id="txForm" class="space-y-6">
+        <input type="hidden" name="id" value="<?= $tx['id'] ?>">
+
         <!-- Khối 1: Thông tin chung hóa đơn -->
         <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">1. Thông Tin Hóa Đơn</h2>
@@ -126,15 +162,20 @@ require_once __DIR__ . '/includes/header.php';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tiêu Đề Chi Tiêu *</label>
-                    <input type="text" name="title" id="txTitle" required placeholder="Ví dụ: Ăn trưa bún đậu, Cafe sáng, Tiền phòng hát..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium">
+                    <input type="text" name="title" id="txTitle" required value="<?= htmlspecialchars($_POST['title'] ?? $tx['title']) ?>" placeholder="Ví dụ: Ăn trưa bún đậu, Cafe sáng, Tiền phòng hát..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Người Đứng Ra Thanh Toán *</label>
                     <select name="payer_id" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-bold text-emerald-800 bg-emerald-50/50">
                         <option value="">-- Chọn thành viên thanh toán --</option>
-                        <?php foreach ($members as $m): ?>
-                            <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?> (<?= htmlspecialchars($m['phone'] ?: 'Không có SĐT') ?>)</option>
+                        <?php 
+                        $selectedPayer = (int)($_POST['payer_id'] ?? $tx['payer_id']);
+                        foreach ($members as $m): 
+                        ?>
+                            <option value="<?= $m['id'] ?>" <?= $selectedPayer === (int)$m['id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($m['name']) ?> (<?= htmlspecialchars($m['phone'] ?: 'Không có SĐT') ?>)
+                            </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -161,8 +202,11 @@ require_once __DIR__ . '/includes/header.php';
                     <div class="sm:col-span-8">
                         <select name="place_id" id="placeSelect" onchange="onPlaceChange(this.value)" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium bg-white">
                             <option value="">-- Không chọn quán / Ăn uống tự do --</option>
-                            <?php foreach ($places as $pl): ?>
-                                <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>">
+                            <?php 
+                            $selectedPlace = (int)($_POST['place_id'] ?? ($tx['place_id'] ?? 0));
+                            foreach ($places as $pl): 
+                            ?>
+                                <option value="<?= $pl['id'] ?>" data-name="<?= htmlspecialchars($pl['name']) ?>" data-address="<?= htmlspecialchars($pl['address'] ?: '') ?>" <?= $selectedPlace === (int)$pl['id'] ? 'selected' : '' ?>>
                                     📍 <?= htmlspecialchars($pl['name']) ?><?= $pl['address'] ? ' (' . htmlspecialchars($pl['address']) . ')' : '' ?>
                                 </option>
                             <?php endforeach; ?>
@@ -194,15 +238,17 @@ require_once __DIR__ . '/includes/header.php';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Trạng Thái</label>
+                    <?php $curStatus = (string)($_POST['status'] ?? $tx['status']); ?>
                     <select name="status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
-                        <option value="completed" selected>Hoàn thành (Tự động tính nợ ngay)</option>
-                        <option value="draft">Bản nháp (Chưa tính nợ)</option>
+                        <option value="completed" <?= $curStatus === 'completed' ? 'selected' : '' ?>>Hoàn thành (Tự động cập nhật công nợ)</option>
+                        <option value="draft" <?= $curStatus === 'draft' ? 'selected' : '' ?>>Bản nháp (Không tính nợ)</option>
+                        <option value="cancelled" <?= $curStatus === 'cancelled' ? 'selected' : '' ?>>Đã hủy (Hủy bỏ công nợ liên quan)</option>
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
-                    <input type="text" name="note" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                    <input type="text" name="note" value="<?= htmlspecialchars($_POST['note'] ?? ($tx['note'] ?? '')) ?>" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
                 </div>
             </div>
         </div>
@@ -212,7 +258,7 @@ require_once __DIR__ . '/includes/header.php';
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
                     <h2 class="text-base font-bold text-slate-900">2. Chi Tiết Sản Phẩm & Phân Bổ Thành Viên</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Mỗi món có thể có nhiều người tham gia, tiền sẽ được chia đều tự động</p>
+                    <p class="text-xs text-slate-500 mt-0.5">Sửa đổi món, giá tiền, số lượng và các thành viên cùng chia sẻ từng món</p>
                 </div>
                 <button type="button" onclick="addItemRow()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition">
                     <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,17 +270,17 @@ require_once __DIR__ . '/includes/header.php';
 
             <!-- Danh sách các hàng món (Container) -->
             <div id="itemsContainer" class="space-y-4">
-                <!-- Javascript sẽ tự động thêm hàng vào đây -->
+                <!-- Javascript sẽ nạp các hàng món hiện tại vào đây -->
             </div>
         </div>
 
         <!-- Nút Submit -->
-        <div class="flex justify-end space-x-3 pt-2">
-            <a href="transactions.php" class="px-5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
-                Hủy
+        <div class="flex items-center justify-between pt-2">
+            <a href="transaction_detail.php?id=<?= $tx['id'] ?>" class="px-5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+                Hủy bỏ
             </a>
             <button type="submit" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition">
-                Lưu & Cập Nhật Công Nợ
+                Lưu Thay Đổi & Cập Nhật Công Nợ
             </button>
         </div>
     </form>
@@ -295,15 +341,16 @@ require_once __DIR__ . '/includes/header.php';
 <script>
 let availableProducts = <?= json_encode($products) ?>;
 const availableMembers = <?= json_encode($members) ?>;
-let selectedPlaceId = 0;
+const initialItems = <?= json_encode($initialItems) ?>;
+let selectedPlaceId = <?= (int)($selectedPlace ?? 0) ?>;
 let itemIndex = 0;
 
 function onPlaceChange(placeId) {
     selectedPlaceId = parseInt(placeId) || 0;
     const placeSelect = document.getElementById('placeSelect');
     const selectedOption = placeSelect.options[placeSelect.selectedIndex];
-    const placeName = selectedOption.getAttribute('data-name') || '';
-    const placeAddress = selectedOption.getAttribute('data-address') || '';
+    const placeName = selectedOption ? (selectedOption.getAttribute('data-name') || '') : '';
+    const placeAddress = selectedOption ? (selectedOption.getAttribute('data-address') || '') : '';
 
     const btnWrap = document.getElementById('addProdForPlaceBtnWrap');
     const notice = document.getElementById('selectedPlaceNotice');
@@ -313,18 +360,11 @@ function onPlaceChange(placeId) {
         btnWrap.style.display = 'block';
         notice.classList.remove('hidden');
         label.textContent = placeName + (placeAddress ? ' — ' + placeAddress : '');
-        
-        // Tự động gợi ý tiêu đề nếu chưa nhập
-        const txTitle = document.getElementById('txTitle');
-        if (!txTitle.value.trim()) {
-            txTitle.value = 'Đi ăn tại ' + placeName;
-        }
     } else {
         btnWrap.style.display = 'none';
         notice.classList.add('hidden');
     }
 
-    // Cập nhật lại dropdown cho tất cả các dòng món hiện có
     refreshAllProductSelects();
 }
 
@@ -374,7 +414,7 @@ function refreshAllProductSelects() {
     });
 }
 
-function addItemRow(preselectProdId = null, prefillPrice = null) {
+function addItemRow(preselectProdId = null, prefillPrice = null, prefillQty = 1, prefillNote = '', prefillMemberIds = null) {
     const container = document.getElementById('itemsContainer');
     const idx = itemIndex++;
 
@@ -386,9 +426,10 @@ function addItemRow(preselectProdId = null, prefillPrice = null) {
 
     let memberCheckboxes = '';
     availableMembers.forEach(m => {
+        const isChecked = (prefillMemberIds === null || prefillMemberIds.includes(parseInt(m.id))) ? 'checked' : '';
         memberCheckboxes += `
             <label class="inline-flex items-center space-x-1.5 p-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 cursor-pointer hover:border-emerald-300">
-                <input type="checkbox" name="items[${idx}][members][]" value="${m.id}" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 member-cb-${idx}">
+                <input type="checkbox" name="items[${idx}][members][]" value="${m.id}" ${isChecked} class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 member-cb-${idx}">
                 <span>${m.name}</span>
             </label>
         `;
@@ -424,12 +465,12 @@ function addItemRow(preselectProdId = null, prefillPrice = null) {
 
             <div class="sm:col-span-2">
                 <label class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Số Lượng</label>
-                <input type="number" name="items[${idx}][quantity]" value="1" min="1" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:border-emerald-500 text-sm text-center bg-white">
+                <input type="number" name="items[${idx}][quantity]" value="${prefillQty || 1}" min="1" class="w-full px-3 py-1.5 rounded-lg border border-slate-300 focus:border-emerald-500 text-sm text-center bg-white">
             </div>
         </div>
 
         <div>
-            <input type="text" name="items[${idx}][note]" placeholder="Ghi chú món này (tùy chọn, vd: ít đường, phần lớn...)" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 bg-white placeholder-slate-400 focus:border-emerald-500">
+            <input type="text" name="items[${idx}][note]" value="${prefillNote ? prefillNote.replace(/"/g, '&quot;') : ''}" placeholder="Ghi chú món này (tùy chọn, vd: ít đường, phần lớn...)" class="w-full px-3 py-1.5 text-xs rounded-lg border border-slate-200 text-slate-700 bg-white placeholder-slate-400 focus:border-emerald-500">
         </div>
 
         <div>
@@ -451,7 +492,7 @@ function addItemRow(preselectProdId = null, prefillPrice = null) {
 
     if (preselectProdId) {
         const selElem = card.querySelector('.product-select');
-        onProductSelect(idx, selElem);
+        onProductSelect(idx, selElem, false);
     }
 }
 
@@ -462,7 +503,7 @@ function removeItemRow(idx) {
     }
 }
 
-function onProductSelect(idx, selectElem) {
+function onProductSelect(idx, selectElem, autoFillPrice = true) {
     const selectedOption = selectElem.options[selectElem.selectedIndex];
     if (!selectedOption) return;
 
@@ -471,11 +512,13 @@ function onProductSelect(idx, selectElem) {
     const placeAddress = selectedOption.getAttribute('data-address');
 
     const priceInput = document.getElementById(`price_${idx}`);
-    if (defaultPrice) {
-        priceInput.value = defaultPrice;
-    } else if (!priceInput.value) {
-        priceInput.value = '';
-        priceInput.placeholder = 'Nhập giá cho lần dùng này';
+    if (autoFillPrice) {
+        if (defaultPrice) {
+            priceInput.value = defaultPrice;
+        } else if (!priceInput.value) {
+            priceInput.value = '';
+            priceInput.placeholder = 'Nhập giá cho lần dùng này';
+        }
     }
 
     const badge = document.getElementById(`itemPlaceBadge_${idx}`);
@@ -526,7 +569,6 @@ async function handleQuickPlaceSubmit(e) {
 
         if (data.success && data.place) {
             const place = data.place;
-            // Thêm vào select
             const placeSelect = document.getElementById('placeSelect');
             const opt = document.createElement('option');
             opt.value = place.id;
@@ -557,7 +599,7 @@ function openQuickProductModal() {
     }
     const placeSelect = document.getElementById('placeSelect');
     const selectedOption = placeSelect.options[placeSelect.selectedIndex];
-    const placeName = selectedOption.getAttribute('data-name') || '';
+    const placeName = selectedOption ? (selectedOption.getAttribute('data-name') || '') : '';
 
     document.getElementById('quickProductPlaceName').textContent = '📍 Quán: ' + placeName;
     document.getElementById('quickProductName').value = '';
@@ -592,13 +634,10 @@ async function handleQuickProductSubmit(e) {
 
         if (data.success && data.product) {
             const newProd = data.product;
-            // Thêm vào mảng availableProducts
             availableProducts.unshift(newProd);
 
             closeQuickProductModal();
-
-            // Tự động thêm ngay 1 hàng mới với món này
-            addItemRow(newProd.id, newProd.default_price);
+            addItemRow(newProd.id, newProd.default_price, 1, '', null);
         } else {
             alert(data.message || 'Lỗi khi thêm món');
         }
@@ -610,9 +649,19 @@ async function handleQuickProductSubmit(e) {
     }
 }
 
-// Khởi tạo ngay 1 hàng khi mở trang
+// Khởi tạo các món từ dữ liệu ban đầu
 document.addEventListener('DOMContentLoaded', () => {
-    addItemRow();
+    if (selectedPlaceId > 0) {
+        onPlaceChange(selectedPlaceId);
+    }
+
+    if (initialItems && initialItems.length > 0) {
+        initialItems.forEach(item => {
+            addItemRow(item.product_id, item.price, item.quantity, item.note, item.member_ids);
+        });
+    } else {
+        addItemRow();
+    }
 });
 </script>
 

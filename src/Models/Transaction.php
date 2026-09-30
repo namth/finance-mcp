@@ -14,6 +14,7 @@ class Transaction
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::getConnection();
+        (new Place($this->db))->ensureSchema();
     }
 
     /**
@@ -21,17 +22,13 @@ class Transaction
      *
      * @param string $title
      * @param int $payerId Người thanh toán hóa đơn
-     * @param array $items Mảng các item:
-     *                     [
-     *                       'product_id' => int,
-     *                       'price'      => ?float (nếu null sẽ lấy default_price của product),
-     *                       'quantity'   => ?int (mặc định 1),
-     *                       'note'       => ?string,
-     *                       'member_ids' => array (danh sách ID thành viên tham gia sử dụng món này),
-     *                       'shares'     => ?array [member_id => amount] (nếu null sẽ tự chia đều)
-     *                     ]
+     * @param array $items Mảng các item
      * @param string $status 'draft' | 'completed'
      * @param string|null $note
+     * @param int $groupId
+     * @param string|null $placeName
+     * @param string|null $placeAddress
+     * @param int|null $placeId
      * @return array Chi tiết giao dịch vừa tạo
      */
     public function create(
@@ -42,7 +39,8 @@ class Transaction
         ?string $note = null,
         int $groupId = 1,
         ?string $placeName = null,
-        ?string $placeAddress = null
+        ?string $placeAddress = null,
+        ?int $placeId = null
     ): array {
         $title = trim($title);
         if (empty($title)) {
@@ -65,16 +63,26 @@ class Transaction
             throw new InvalidArgumentException("Trạng thái không hợp lệ. Cho phép: " . implode(', ', $validStatuses));
         }
 
+        // Nếu có thông tin tên hoặc địa chỉ quán mà chưa có place_id, tự động nhận diện
+        if (($placeId === null || $placeId <= 0) && (!empty($placeName) || !empty($placeAddress))) {
+            $pl = (new Place($this->db))->resolvePlace(null, $placeName, $placeAddress, null, $groupId);
+            if ($pl) {
+                $placeId = (int)$pl['id'];
+            }
+        }
+        $placeId = ($placeId !== null && $placeId > 0) ? $placeId : null;
+
         $this->db->beginTransaction();
 
         try {
             // Tạo bản ghi transactions trước với total_amount = 0
             $stmt = $this->db->prepare("
-                INSERT INTO `transactions` (`group_id`, `title`, `payer_id`, `total_amount`, `status`, `note`)
-                VALUES (:group_id, :title, :payer_id, 0.00, :status, :note)
+                INSERT INTO `transactions` (`group_id`, `place_id`, `title`, `payer_id`, `total_amount`, `status`, `note`)
+                VALUES (:group_id, :place_id, :title, :payer_id, 0.00, :status, :note)
             ");
             $stmt->execute([
                 ':group_id' => $groupId,
+                ':place_id' => $placeId,
                 ':title'    => $title,
                 ':payer_id' => $payerId,
                 ':status'   => $status,
@@ -239,9 +247,11 @@ class Transaction
     public function all(?string $status = null, int $limit = 50, int $offset = 0, ?int $groupId = null): array
     {
         $sql = "
-            SELECT t.*, m.name AS payer_name, m.phone AS payer_phone
+            SELECT t.*, m.name AS payer_name, m.phone AS payer_phone,
+                   pl.name AS place_name, pl.address AS place_address
             FROM `transactions` t
             JOIN `members` m ON t.payer_id = m.id
+            LEFT JOIN `places` pl ON t.place_id = pl.id
         ";
         $conditions = [];
         $params = [];
@@ -270,9 +280,11 @@ class Transaction
     public function find(int $id): ?array
     {
         $stmt = $this->db->prepare("
-            SELECT t.*, m.name AS payer_name, m.phone AS payer_phone, m.email AS payer_email
+            SELECT t.*, m.name AS payer_name, m.phone AS payer_phone, m.email AS payer_email,
+                   pl.name AS place_name, pl.address AS place_address
             FROM `transactions` t
             JOIN `members` m ON t.payer_id = m.id
+            LEFT JOIN `places` pl ON t.place_id = pl.id
             WHERE t.id = :id
         ");
         $stmt->execute([':id' => $id]);
@@ -348,6 +360,18 @@ class Transaction
             }
             $fields[] = "`payer_id` = :payer_id";
             $params[':payer_id'] = $payerId;
+        }
+
+        if (array_key_exists('place_id', $data)) {
+            $placeId = !empty($data['place_id']) && (int)$data['place_id'] > 0 ? (int)$data['place_id'] : null;
+            $fields[] = "`place_id` = :place_id";
+            $params[':place_id'] = $placeId;
+        } elseif (!empty($data['place_name']) || !empty($data['place_address'])) {
+            $pl = (new Place($this->db))->resolvePlace(null, $data['place_name'] ?? null, $data['place_address'] ?? null, null, $effectiveGroupId);
+            if ($pl) {
+                $fields[] = "`place_id` = :place_id";
+                $params[':place_id'] = (int)$pl['id'];
+            }
         }
 
         if (array_key_exists('status', $data)) {
@@ -445,6 +469,80 @@ class Transaction
 
             $this->db->commit();
             return $res;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Sửa nhanh giá (và số lượng) của một món trong giao dịch và tự động phân bổ lại số tiền cho các thành viên
+     */
+    public function updateItemPrice(int $transactionId, int $itemId, float $newPrice, ?int $newQuantity = null): bool
+    {
+        $tx = $this->find($transactionId);
+        if (!$tx) {
+            throw new InvalidArgumentException("Giao dịch #{$transactionId} không tồn tại.");
+        }
+
+        if ($newPrice < 0) {
+            throw new InvalidArgumentException("Đơn giá không được là số âm.");
+        }
+
+        // Kiểm tra item có thuộc transaction này không
+        $stmtItem = $this->db->prepare("SELECT * FROM `transaction_items` WHERE `id` = :item_id AND `transaction_id` = :tx_id");
+        $stmtItem->execute([':item_id' => $itemId, ':tx_id' => $transactionId]);
+        $item = $stmtItem->fetch();
+        if (!$item) {
+            throw new InvalidArgumentException("Món không tồn tại trong giao dịch này.");
+        }
+
+        $quantity = ($newQuantity !== null && $newQuantity > 0) ? (int)$newQuantity : (int)$item['quantity'];
+        $subtotal = round($newPrice * $quantity, 2);
+
+        $this->db->beginTransaction();
+        try {
+            // 1. Cập nhật giá và số lượng trong transaction_items
+            $stmtUpd = $this->db->prepare("UPDATE `transaction_items` SET `price` = :price, `quantity` = :quantity WHERE `id` = :id");
+            $stmtUpd->execute([
+                ':price'    => round($newPrice, 2),
+                ':quantity' => $quantity,
+                ':id'       => $itemId,
+            ]);
+
+            // 2. Lấy danh sách thành viên đang dùng món này và chia đều lại số tiền
+            $stmtMem = $this->db->prepare("SELECT `id`, `member_id` FROM `transaction_item_members` WHERE `item_id` = :item_id ORDER BY `id` ASC");
+            $stmtMem->execute([':item_id' => $itemId]);
+            $members = $stmtMem->fetchAll();
+            $mCount = count($members);
+
+            if ($mCount > 0) {
+                $sharePerMember = round($subtotal / $mCount, 2);
+                $allocatedTotal = 0.00;
+
+                foreach ($members as $idx => $m) {
+                    if ($idx === $mCount - 1) {
+                        $curShare = round($subtotal - $allocatedTotal, 2);
+                    } else {
+                        $curShare = $sharePerMember;
+                        $allocatedTotal += $curShare;
+                    }
+
+                    $this->db->prepare("UPDATE `transaction_item_members` SET `share_amount` = :share WHERE `id` = :id")
+                             ->execute([':share' => $curShare, ':id' => $m['id']]);
+                }
+            }
+
+            // 3. Tính lại tổng tiền của transaction
+            $stmtTotal = $this->db->prepare("SELECT SUM(price * quantity) AS total FROM `transaction_items` WHERE `transaction_id` = :tx_id");
+            $stmtTotal->execute([':tx_id' => $transactionId]);
+            $newTotal = (float)($stmtTotal->fetch()['total'] ?? 0.0);
+
+            $this->db->prepare("UPDATE `transactions` SET `total_amount` = :total WHERE `id` = :id")
+                     ->execute([':total' => round($newTotal, 2), ':id' => $transactionId]);
+
+            $this->db->commit();
+            return true;
         } catch (\Throwable $e) {
             $this->db->rollBack();
             throw $e;

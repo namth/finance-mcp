@@ -602,6 +602,125 @@ class McpServer
                     ];
                 })(),
 
+                'payment_qr_get' => (function () use ($debtManager, $memberModel, $args) {
+                    $groupId = $this->getEffectiveGroupId($args);
+                    $debtId = (int)($args['debt_id'] ?? 0);
+                    $debtToken = trim((string)($args['debt_token'] ?? ''));
+                    $debtorId = (int)($args['debtor_id'] ?? 0);
+                    $creditorId = (int)($args['creditor_id'] ?? 0);
+                    $amount = isset($args['amount']) ? (float)$args['amount'] : 0.0;
+                    $memo = trim((string)($args['memo'] ?? ''));
+
+                    $debt = null;
+                    if ($debtId > 0) {
+                        $summary = $debtManager->getSummary(null, $groupId);
+                        foreach ($summary as $s) {
+                            if ((int)$s['id'] === $debtId) {
+                                $debt = $s;
+                                break;
+                            }
+                        }
+                    } elseif (!empty($debtToken)) {
+                        $debt = $debtManager->getDebtByToken($debtToken);
+                    } elseif ($debtorId > 0 && $creditorId > 0) {
+                        $summary = $debtManager->getSummary($debtorId, $groupId);
+                        foreach ($summary as $s) {
+                            if ((int)$s['debtor_id'] === $debtorId && (int)$s['creditor_id'] === $creditorId) {
+                                $debt = $s;
+                                break;
+                            }
+                        }
+                    }
+
+                    $creditorName = 'Người nhận';
+                    $debtorName = 'Người chuyển';
+                    $bankBin = trim((string)($args['bank_bin'] ?? ''));
+                    $bankName = '';
+                    $accountNo = trim((string)($args['bank_account_no'] ?? ''));
+                    $accountName = trim((string)($args['bank_account_name'] ?? ''));
+
+                    if ($debt) {
+                        $debtorName = $debt['debtor_name'] ?? 'Người chuyển';
+                        $creditorName = $debt['creditor_name'] ?? 'Người nhận';
+                        if ($amount <= 0) {
+                            $amount = (float)$debt['amount'];
+                        }
+                        if (empty($bankBin) && !empty($debt['bank_bin'])) {
+                            $bankBin = $debt['bank_bin'];
+                            $bankName = $debt['bank_name'] ?? '';
+                            $accountNo = $debt['bank_account_no'] ?? '';
+                            $accountName = $debt['bank_account_name'] ?: $debt['creditor_name'];
+                        }
+                        $debtToken = $debt['debt_token'] ?? $debtToken;
+                    } else {
+                        if ($creditorId > 0) {
+                            $c = $memberModel->find($creditorId);
+                            if ($c) {
+                                $creditorName = $c['name'];
+                            }
+                        }
+                        if ($debtorId > 0) {
+                            $d = $memberModel->find($debtorId);
+                            if ($d) {
+                                $debtorName = $d['name'];
+                            }
+                        }
+                    }
+
+                    if (empty($bankBin) || empty($accountNo)) {
+                        throw new \InvalidArgumentException("Người nhận ({$creditorName}) chưa cấu hình tài khoản ngân hàng trong hệ thống. Vui lòng cung cấp bank_bin và bank_account_no hoặc yêu cầu {$creditorName} cập nhật thông tin ngân hàng trong trang cá nhân.");
+                    }
+
+                    if ($amount <= 0) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp số tiền cần thanh toán (amount).");
+                    }
+
+                    $bank = BankList::findByBin($bankBin);
+                    if ($bank) {
+                        $bankName = $bank['short_name'] . ' (' . $bank['name'] . ')';
+                    }
+
+                    if (empty($memo)) {
+                        $memo = BankList::cleanMemo("{$debtorName} tra {$creditorName}");
+                    } else {
+                        $memo = BankList::cleanMemo($memo);
+                    }
+
+                    $qrImageUrl = BankList::generateVietQrUrl($bankBin, $accountNo, $amount, $memo, $accountName ?: $creditorName);
+                    $payUrl = !empty($debtToken) ? "https://financemcp.oa.io.vn/pay.php?token=" . urlencode($debtToken) : null;
+
+                    $amountFormatted = number_format($amount, 0, ',', '.') . ' đ';
+
+                    $lines = [];
+                    $lines[] = "💳 THÔNG TIN THANH TOÁN VIETQR";
+                    $lines[] = "• Người nhận: {$creditorName}" . ($accountName ? " ({$accountName})" : "");
+                    $lines[] = "• Ngân hàng: {$bankName} (Mã BIN: {$bankBin})";
+                    $lines[] = "• Số tài khoản: {$accountNo}";
+                    $lines[] = "• Số tiền: {$amountFormatted}";
+                    $lines[] = "• Nội dung chuyển khoản: {$memo}";
+                    $lines[] = "• Ảnh mã QR VietQR: {$qrImageUrl}";
+                    if ($payUrl) {
+                        $lines[] = "• Link thanh toán công khai: {$payUrl}";
+                    }
+
+                    return [
+                        'success'         => true,
+                        'qr_image_url'    => $qrImageUrl,
+                        'pay_url'         => $payUrl,
+                        'amount'          => $amount,
+                        'memo'            => $memo,
+                        'bank_info'       => [
+                            'bank_bin'          => $bankBin,
+                            'bank_name'         => $bankName,
+                            'bank_account_no'   => $accountNo,
+                            'bank_account_name' => $accountName ?: $creditorName,
+                        ],
+                        'debtor_name'     => $debtorName,
+                        'creditor_name'   => $creditorName,
+                        'summary_text'    => implode("\n", $lines),
+                    ];
+                })(),
+
                 default => throw new \InvalidArgumentException("Không hỗ trợ tool: {$name}")
             };
 
@@ -1000,6 +1119,25 @@ class McpServer
                     'type' => 'object',
                     'properties' => [
                         'group_id' => ['type' => 'integer', 'description' => 'ID nhóm (tùy chọn)'],
+                    ],
+                ],
+            ],
+            'payment_qr_get' => [
+                'name' => 'payment_qr_get',
+                'description' => 'Lấy link ảnh mã QR VietQR (chuẩn Napas/VietQR) và link thanh toán trực tuyến để trả nợ hoặc chuyển tiền. Hỗ trợ lấy theo debt_id, debt_token, hoặc theo creditor_id (người nhận) và debtor_id (người chuyển).',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'debt_id'           => ['type' => 'integer', 'description' => 'ID khoản nợ cần thanh toán (nếu có)'],
+                        'debt_token'        => ['type' => 'string',  'description' => 'Token thanh toán công khai của khoản nợ (nếu có)'],
+                        'creditor_id'       => ['type' => 'integer', 'description' => 'ID người nhận tiền (chủ nợ)'],
+                        'debtor_id'         => ['type' => 'integer', 'description' => 'ID người chuyển tiền (con nợ)'],
+                        'amount'            => ['type' => 'number',  'description' => 'Số tiền cần chuyển (nếu không truyền sẽ tự lấy theo số tiền nợ)'],
+                        'memo'              => ['type' => 'string',  'description' => 'Nội dung chuyển khoản (tùy chọn)'],
+                        'bank_bin'          => ['type' => 'string',  'description' => 'Mã BIN ngân hàng nếu muốn chỉ định (ví dụ: 970422 cho MBBank, 970436 cho Vietcombank)'],
+                        'bank_account_no'   => ['type' => 'string',  'description' => 'Số tài khoản ngân hàng người nhận nếu muốn chỉ định'],
+                        'bank_account_name' => ['type' => 'string',  'description' => 'Tên chủ tài khoản người nhận nếu muốn chỉ định'],
+                        'group_id'          => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
                     ],
                 ],
             ],

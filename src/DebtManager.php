@@ -228,7 +228,7 @@ class DebtManager
         $stmt->execute($params);
         $rows = $stmt->fetchAll();
 
-        // Tự động gán debt_token nếu các khoản nợ cũ chưa có
+        // Tự động gán debt_token nếu các khoản nợ cũ chưa có và sinh link QR code
         foreach ($rows as &$r) {
             if (empty($r['debt_token'])) {
                 $r['debt_token'] = bin2hex(random_bytes(16));
@@ -236,6 +236,21 @@ class DebtManager
                     $this->db->prepare("UPDATE `debts` SET `debt_token` = :token WHERE `id` = :id")
                              ->execute([':token' => $r['debt_token'], ':id' => $r['id']]);
                 } catch (\Throwable $e) {}
+            }
+
+            $r['pay_url'] = "https://financemcp.oa.io.vn/pay.php?token=" . urlencode($r['debt_token']);
+
+            if (!empty($r['bank_bin']) && !empty($r['bank_account_no'])) {
+                $memo = BankList::cleanMemo("{$r['debtor_name']} tra {$r['creditor_name']}");
+                $r['qr_image_url'] = BankList::generateVietQrUrl(
+                    $r['bank_bin'],
+                    $r['bank_account_no'],
+                    (float)$r['amount'],
+                    $memo,
+                    $r['bank_account_name'] ?: $r['creditor_name']
+                );
+            } else {
+                $r['qr_image_url'] = null;
             }
         }
 

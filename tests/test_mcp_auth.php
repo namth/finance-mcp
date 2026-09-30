@@ -4,16 +4,18 @@
  * Test authentication on McpServer JSON-RPC directly
  */
 
+spl_autoload_register(function ($class) {
+    $prefix = 'SimpleFinance\\';
+    $baseDir = __DIR__ . '/../src/';
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) return;
+    $relativeClass = substr($class, $len);
+    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    if (file_exists($file)) require_once $file;
+});
+
 require_once __DIR__ . '/../src/Security/Crypto.php';
 require_once __DIR__ . '/../src/Database.php';
-require_once __DIR__ . '/../src/Models/User.php';
-require_once __DIR__ . '/../src/Models/Group.php';
-require_once __DIR__ . '/../src/Models/Member.php';
-require_once __DIR__ . '/../src/Models/Product.php';
-require_once __DIR__ . '/../src/Models/Transaction.php';
-require_once __DIR__ . '/../src/Models/Settlement.php';
-require_once __DIR__ . '/../src/DebtManager.php';
-require_once __DIR__ . '/../src/McpServer.php';
 
 use SimpleFinance\Security\Crypto;
 use SimpleFinance\Models\User;
@@ -30,8 +32,9 @@ CREATE TABLE user_timeline_events (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id
 CREATE TABLE groups (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT, owner_id INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE group_members (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL, user_id INTEGER NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'member', joined_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(group_id, user_id));
 CREATE TABLE members (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, phone TEXT, email TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, name TEXT NOT NULL, default_price NUMERIC, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
-CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, title TEXT NOT NULL, payer_id INTEGER NOT NULL, total_amount NUMERIC NOT NULL DEFAULT 0.00, status TEXT NOT NULL DEFAULT 'completed', note TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE places (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, name TEXT NOT NULL, address TEXT, map_url TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE products (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, place_id INTEGER, name TEXT NOT NULL, default_price NUMERIC, description TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, place_id INTEGER, title TEXT NOT NULL, payer_id INTEGER NOT NULL, total_amount NUMERIC NOT NULL DEFAULT 0.00, status TEXT NOT NULL DEFAULT 'completed', note TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id INTEGER NOT NULL, product_id INTEGER NOT NULL, price NUMERIC NOT NULL, quantity INTEGER NOT NULL DEFAULT 1, subtotal NUMERIC NOT NULL DEFAULT 0.00, note TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE transaction_item_members (id INTEGER PRIMARY KEY AUTOINCREMENT, item_id INTEGER NOT NULL, member_id INTEGER NOT NULL, share_amount NUMERIC NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE debts (id INTEGER PRIMARY KEY AUTOINCREMENT, group_id INTEGER NOT NULL DEFAULT 1, debtor_id INTEGER NOT NULL, creditor_id INTEGER NOT NULL, amount NUMERIC NOT NULL DEFAULT 0.00, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(group_id, debtor_id, creditor_id));

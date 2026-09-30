@@ -123,6 +123,92 @@ class McpServer
         return 1; // Fallback
     }
 
+    /**
+     * Tự động tổng hợp và tính toán chi tiết phần tiền mỗi thành viên phải trả,
+     * đồng thời tạo báo cáo văn bản tóm tắt thân thiện cho người dùng/AI.
+     */
+    private function buildTransactionSplitSummary(array $tx): array
+    {
+        $payerId = (int)($tx['payer_id'] ?? 0);
+        $payerName = $tx['payer_name'] ?? "Thành viên #{$payerId}";
+        $totalAmount = (float)($tx['total_amount'] ?? 0);
+        $title = $tx['title'] ?? 'Giao dịch';
+        $placeName = $tx['place_name'] ?? null;
+        $placeAddress = $tx['place_address'] ?? null;
+
+        $memberShares = [];
+        $itemsBreakdown = [];
+
+        foreach ($tx['items'] ?? [] as $item) {
+            $pName = $item['product_name'] ?? 'Món';
+            $qty = max(1, (int)($item['quantity'] ?? 1));
+            $price = (float)($item['price'] ?? 0);
+            $subtotal = (!empty($item['subtotal']) && (float)$item['subtotal'] > 0) ? (float)$item['subtotal'] : round($price * $qty, 2);
+            $sharedNames = [];
+
+            foreach ($item['members'] ?? [] as $m) {
+                $mId = (int)$m['member_id'];
+                $mName = $m['member_name'] ?? "Thành viên #{$mId}";
+                $sAmount = (float)($m['share_amount'] ?? 0);
+
+                $sharedNames[] = $mName;
+                if (!isset($memberShares[$mId])) {
+                    $memberShares[$mId] = [
+                        'member_id'   => $mId,
+                        'member_name' => $mName,
+                        'total_share' => 0.0,
+                    ];
+                }
+                $memberShares[$mId]['total_share'] = round($memberShares[$mId]['total_share'] + $sAmount, 2);
+            }
+
+            $itemsBreakdown[] = [
+                'product_name' => $pName,
+                'quantity'     => $qty,
+                'price'        => $price,
+                'subtotal'     => $subtotal,
+                'shared_by'    => $sharedNames,
+                'per_person'   => count($sharedNames) > 0 ? round($subtotal / count($sharedNames), 2) : 0,
+            ];
+        }
+
+        // Tạo văn bản tóm tắt rõ ràng bằng tiếng Việt cho người dùng/AI
+        $lines = [];
+        $lines[] = "🧾 Giao dịch: \"{$title}\"" . ($placeName ? " tại {$placeName}" . ($placeAddress ? " ({$placeAddress})" : "") : "");
+        $lines[] = "💰 Tổng hóa đơn: " . number_format($totalAmount, 0, ',', '.') . " đ";
+        $lines[] = "👤 Người thanh toán: {$payerName} (đã thanh toán toàn bộ " . number_format($totalAmount, 0, ',', '.') . " đ)";
+        $lines[] = "📊 Kết quả hệ thống tự động phân chia tiền:";
+
+        foreach ($memberShares as $mId => $m) {
+            $formattedAmount = number_format($m['total_share'], 0, ',', '.') . " đ";
+            if ($mId === $payerId) {
+                $lines[] = "  • {$m['member_name']}: {$formattedAmount} (phần tiền tự chi trả)";
+            } else {
+                $lines[] = "  • {$m['member_name']}: {$formattedAmount} (cần trả lại cho {$payerName})";
+            }
+        }
+
+        if (!empty($itemsBreakdown)) {
+            $lines[] = "🍽️ Chi tiết từng món:";
+            foreach ($itemsBreakdown as $idx => $ib) {
+                $stFormatted = number_format($ib['subtotal'], 0, ',', '.') . " đ";
+                $perFormatted = number_format($ib['per_person'], 0, ',', '.') . " đ/người";
+                $membersStr = implode(', ', $ib['shared_by']);
+                $num = $idx + 1;
+                $lines[] = "  {$num}. {$ib['product_name']} x{$ib['quantity']}: {$stFormatted} [{$membersStr}] -> {$perFormatted}";
+            }
+        }
+
+        return [
+            'total_amount'    => $totalAmount,
+            'payer_id'        => $payerId,
+            'payer_name'      => $payerName,
+            'member_shares'   => array_values($memberShares),
+            'items_breakdown' => $itemsBreakdown,
+            'summary_text'    => implode("\n", $lines),
+        ];
+    }
+
     private function executeTool($id, string $name, array $args): array
     {
         try {
@@ -277,7 +363,13 @@ class McpServer
                         $debtManager->processTransaction((int)$tx['id']);
                     }
 
+                    $splitSummary = $this->buildTransactionSplitSummary($tx);
+
                     return [
+                        'success'       => true,
+                        'message'       => "Đã tạo giao dịch #{$tx['id']} thành công. Hệ thống đã tự động tính toán chi phí và phân chia tiền cho từng thành viên.",
+                        'summary_text'  => $splitSummary['summary_text'],
+                        'split_summary' => $splitSummary,
                         'transaction'   => $tx,
                         'group_id'      => $groupId,
                         'debts_updated' => ($status === 'completed'),
@@ -308,11 +400,16 @@ class McpServer
                         $debtsRecalculated = true;
                     }
 
+                    $splitSummary = $this->buildTransactionSplitSummary($updatedTx);
+
                     return [
+                        'success'            => true,
+                        'message'            => "Đã cập nhật giao dịch #{$id} thành công" . ($debtsRecalculated ? " và tự động tính toán lại công nợ của nhóm." : "."),
+                        'summary_text'       => $splitSummary['summary_text'],
+                        'split_summary'      => $splitSummary,
                         'transaction'        => $updatedTx,
                         'group_id'           => $groupId,
                         'debts_recalculated' => $debtsRecalculated,
-                        'message'            => "Đã cập nhật giao dịch #{$id} thành công" . ($debtsRecalculated ? " và tự động tính toán lại công nợ của nhóm." : "."),
                     ];
                 })(),
 
@@ -359,6 +456,9 @@ class McpServer
                     if (!$tx) {
                         throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$id}");
                     }
+                    $splitSummary = $this->buildTransactionSplitSummary($tx);
+                    $tx['split_summary'] = $splitSummary;
+                    $tx['summary_text'] = $splitSummary['summary_text'];
                     return $tx;
                 })(),
 
@@ -610,7 +710,7 @@ class McpServer
             // Transactions
             'transaction_create' => [
                 'name' => 'transaction_create',
-                'description' => 'Tạo giao dịch chi tiêu mới gồm nhiều sản phẩm/dịch vụ, hỗ trợ nhận diện món ăn/đồ uống theo tên hoặc ID, ưu tiên khớp theo vị trí quán/địa điểm (nếu chưa có trong danh mục sẽ tự động thêm mới), lấy giá mặc định hoặc giá tùy chỉnh, chỉ định người thanh toán và phân chia cho các thành viên.',
+                'description' => 'Tạo giao dịch chi tiêu mới gồm nhiều sản phẩm/dịch vụ. Hệ thống sẽ TỰ ĐỘNG tính toán chi phí, tự động chia đều tiền từng món cho các thành viên tham gia (member_ids) và trả về bảng chi tiết số tiền mỗi người phải chi trả/nợ.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
@@ -641,12 +741,8 @@ class McpServer
                                     'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán cho món này (nếu khác địa chỉ chung)'],
                                     'member_ids'    => [
                                         'type'        => 'array',
-                                        'description' => 'Danh sách ID các thành viên cùng sử dụng',
+                                        'description' => 'Danh sách ID các thành viên cùng sử dụng món này. Lưu ý quan trọng: Hệ thống sẽ TỰ ĐỘNG tính toán và chia đều số tiền của món cho các thành viên này (Người dùng/AI KHÔNG cần và KHÔNG phải tự nhập số tiền chia).',
                                         'items'       => ['type' => 'integer'],
-                                    ],
-                                    'shares'        => [
-                                        'type'        => 'object',
-                                        'description' => 'Phân chia tiền chi tiết theo thành viên {member_id: amount}. Nếu để trống sẽ tự động chia đều.',
                                     ],
                                 ],
                                 'required' => ['member_ids'],
@@ -658,7 +754,7 @@ class McpServer
             ],
             'transaction_update' => [
                 'name' => 'transaction_update',
-                'description' => 'Cập nhật hoặc sửa thông tin giao dịch (đổi giá sản phẩm, sửa người trả tiền, thay đổi danh sách món, phân chia lại tiền người tham gia, đổi trạng thái). Hệ thống sẽ tự động tính toán lại toàn bộ bảng công nợ của nhóm.',
+                'description' => 'Cập nhật hoặc sửa thông tin giao dịch (đổi giá sản phẩm, sửa người trả tiền, thay đổi danh sách món, đổi thành viên tham gia, đổi trạng thái). Hệ thống sẽ TỰ ĐỘNG tính toán lại số tiền phân bổ cho từng thành viên và tự động tính toán lại toàn bộ bảng công nợ của nhóm.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
@@ -689,12 +785,8 @@ class McpServer
                                     'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán cho món này'],
                                     'member_ids'    => [
                                         'type'        => 'array',
-                                        'description' => 'Danh sách ID các thành viên cùng sử dụng',
+                                        'description' => 'Danh sách ID các thành viên cùng sử dụng món này. Hệ thống TỰ ĐỘNG tính toán và chia đều tiền cho các thành viên.',
                                         'items'       => ['type' => 'integer'],
-                                    ],
-                                    'shares'        => [
-                                        'type'        => 'object',
-                                        'description' => 'Phân chia tiền chi tiết theo thành viên {member_id: amount}',
                                     ],
                                 ],
                                 'required' => ['member_ids'],

@@ -133,24 +133,24 @@ $pageTitle = "Quản Lý Sản Phẩm & Quán - SimpleFinance";
 require_once __DIR__ . '/includes/header.php';
 ?>
 
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
     <div>
-        <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Danh Mục Sản Phẩm & Quán</h1>
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Danh Mục Sản Phẩm & Quán</h1>
         <p class="text-xs text-slate-500 mt-1">Các món ăn, đồ uống, dịch vụ gắn liền với địa điểm quán để chia hóa đơn</p>
     </div>
-    <div class="flex items-center space-x-2.5">
-        <button onclick="openManagePlacesModal()" class="inline-flex items-center px-3.5 py-2 text-sm font-semibold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:border-slate-400 shadow-sm transition">
-            <svg class="w-4 h-4 mr-1.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex flex-wrap sm:flex-nowrap items-center gap-2">
+        <button onclick="openManagePlacesModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center px-3.5 py-2 text-xs sm:text-sm font-semibold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 active:scale-95 shadow-2xs transition">
+            <svg class="w-4 h-4 mr-1.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
-            Quản Lý Quán (<?= count($places) ?>)
+            Quán (<?= count($places) ?>)
         </button>
-        <button onclick="openAddProductModal()" class="inline-flex items-center px-4 py-2 text-sm font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition">
-            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button onclick="openAddProductModal()" class="flex-1 sm:flex-initial inline-flex items-center justify-center px-3.5 sm:px-4 py-2 text-xs sm:text-sm font-semibold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 active:scale-95 transition">
+            <svg class="w-4 h-4 mr-1.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
             </svg>
-            Thêm Sản Phẩm Mới
+            Thêm Món Mới
         </button>
     </div>
 </div>
@@ -173,13 +173,76 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
     <?php if (empty($products)): ?>
-        <div class="py-12 text-center text-slate-400">
-            Chưa có sản phẩm hoặc dịch vụ nào. Hãy nhấn "Thêm Sản Phẩm Mới" để tạo.
+        <div class="py-12 text-center text-slate-400 px-4">
+            Chưa có sản phẩm hoặc dịch vụ nào. Hãy nhấn "Thêm Món Mới" để tạo.
         </div>
     <?php else: ?>
-        <div class="overflow-x-auto">
+        <!-- Giao diện Thẻ trên Mobile (< md) -->
+        <div class="md:hidden divide-y divide-slate-100">
+            <?php foreach ($products as $p): ?>
+                <div class="p-4 space-y-2.5">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="flex items-center space-x-1.5">
+                                <span class="px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-mono text-[10px]">#<?= $p['id'] ?></span>
+                                <h3 class="font-bold text-slate-900 text-sm"><?= htmlspecialchars($p['name']) ?></h3>
+                            </div>
+                            <?php if (!empty($p['place_name'])): ?>
+                                <div class="flex items-center text-xs text-emerald-700 font-medium mt-1">
+                                    <svg class="w-3.5 h-3.5 mr-1 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                    <span class="truncate"><?= htmlspecialchars($p['place_name']) ?></span>
+                                    <?php if (!empty($p['place_address'])): ?>
+                                        <span class="text-slate-400 text-[11px] ml-1 truncate">(<?= htmlspecialchars($p['place_address']) ?>)</span>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <p class="text-[11px] text-slate-400 italic mt-0.5">Chưa gắn quán</p>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="text-right flex-shrink-0">
+                            <?php if ($p['default_price'] !== null): ?>
+                                <span class="text-base font-extrabold text-emerald-700"><?= number_format($p['default_price']) ?> đ</span>
+                            <?php else: ?>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                    Giá linh hoạt
+                                </span>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <?php if (!empty($p['description'])): ?>
+                        <p class="text-xs text-slate-500 line-clamp-2"><?= htmlspecialchars($p['description']) ?></p>
+                    <?php endif; ?>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                        <span class="text-[11px] text-slate-400">Tạo: <?= htmlspecialchars(substr($p['created_at'], 0, 10)) ?></span>
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" 
+                                    onclick="openEditProductModal(<?= $p['id'] ?>, '<?= htmlspecialchars(addslashes($p['name'])) ?>', '<?= $p['place_id'] ?? '' ?>', '<?= $p['default_price'] !== null ? $p['default_price'] : '' ?>', '<?= htmlspecialchars(addslashes($p['description'] ?? '')) ?>')"
+                                    class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition border border-slate-200">
+                                Sửa
+                            </button>
+                            <form method="POST" action="products.php" class="inline" onsubmit="return confirm('Bạn có chắc muốn xóa món này?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="<?= $p['id'] ?>">
+                                <button type="submit" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition border border-rose-200">
+                                    Xóa
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Giao diện Bảng trên Desktop (>= md) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase">
                     <tr>
@@ -262,7 +325,7 @@ require_once __DIR__ . '/includes/header.php';
 <!-- 1. MODAL THÊM / SỬA SẢN PHẨM                  -->
 <!-- ============================================== -->
 <div id="productModal" class="fixed inset-0 z-40 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 class="text-base font-bold text-slate-900" id="modalTitle">Thêm Sản Phẩm / Dịch Vụ Mới</h3>
             <button type="button" onclick="closeProductModal()" class="text-slate-400 hover:text-slate-600">
@@ -336,7 +399,7 @@ require_once __DIR__ . '/includes/header.php';
 <!-- 2. MODAL TẠO NHANH QUÁN TRONG FORM SẢN PHẨM    -->
 <!-- ============================================== -->
 <div id="quickAddPlaceModal" class="fixed inset-0 z-50 hidden bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 class="text-base font-bold text-slate-900 flex items-center">
                 <svg class="w-4 h-4 mr-1.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -357,24 +420,24 @@ require_once __DIR__ . '/includes/header.php';
         <form id="quickPlaceForm" onsubmit="handleQuickPlaceSubmit(event)" class="mt-4 space-y-3.5">
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tên Quán *</label>
-                <input type="text" id="quickPlaceName" required placeholder="Ví dụ: Highlands Coffee, Phở 10 Lý Quốc Sư..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                <input type="text" id="quickPlaceName" required placeholder="Ví dụ: Highlands Coffee, Phở 10 Lý Quốc Sư..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Địa Chỉ / Địa Điểm</label>
-                <input type="text" id="quickPlaceAddress" placeholder="Ví dụ: 123 Lê Lợi, Quận 1..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                <input type="text" id="quickPlaceAddress" placeholder="Ví dụ: 123 Lê Lợi, Quận 1..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Link Google Maps <span class="text-slate-400 font-normal normal-case">(Tùy chọn)</span></label>
-                <input type="url" id="quickPlaceMapUrl" placeholder="https://maps.app.goo.gl/... hoặc https://google.com/maps/..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                <input type="url" id="quickPlaceMapUrl" placeholder="https://maps.app.goo.gl/... hoặc https://google.com/maps/..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
 
             <div class="pt-2 flex justify-end space-x-2.5">
-                <button type="button" onclick="closeQuickAddPlaceModal()" class="px-3.5 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                <button type="button" onclick="closeQuickAddPlaceModal()" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
                     Hủy
                 </button>
-                <button type="submit" id="btnSaveQuickPlace" class="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 transition flex items-center">
+                <button type="submit" id="btnSaveQuickPlace" class="px-4 py-2.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-md shadow-emerald-600/20 active:scale-95 transition flex items-center">
                     <span>Thêm & Chọn Luôn</span>
                 </button>
             </div>
@@ -385,8 +448,8 @@ require_once __DIR__ . '/includes/header.php';
 <!-- ============================================== -->
 <!-- 3. MODAL QUẢN LÝ DANH SÁCH QUÁN                -->
 <!-- ============================================== -->
-<div id="managePlacesModal" class="fixed inset-0 z-40 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
+<div id="managePlacesModal" class="fixed inset-0 z-40 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
             <div>
                 <h3 class="text-base font-bold text-slate-900 flex items-center">

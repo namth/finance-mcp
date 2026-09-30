@@ -79,26 +79,90 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<!-- Bộ lọc trạng thái -->
-<div class="mb-5 flex space-x-2 text-xs font-semibold">
-    <a href="transactions.php" class="px-3 py-1.5 rounded-lg border transition <?= $statusFilter === null ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
+<!-- Bộ lọc trạng thái (Hỗ trợ vuốt ngang trên Mobile) -->
+<div class="mb-5 overflow-x-auto py-1 flex space-x-2 text-xs font-semibold scrollbar-none">
+    <a href="transactions.php" class="px-3.5 py-2 rounded-xl border whitespace-nowrap transition <?= $statusFilter === null ? 'bg-slate-900 text-white border-slate-900 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
         Tất cả
     </a>
-    <a href="transactions.php?status=completed" class="px-3 py-1.5 rounded-lg border transition <?= $statusFilter === 'completed' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
+    <a href="transactions.php?status=completed" class="px-3.5 py-2 rounded-xl border whitespace-nowrap transition <?= $statusFilter === 'completed' ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
         Đã hoàn thành (Tính nợ)
     </a>
-    <a href="transactions.php?status=draft" class="px-3 py-1.5 rounded-lg border transition <?= $statusFilter === 'draft' ? 'bg-amber-600 text-white border-amber-600' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
+    <a href="transactions.php?status=draft" class="px-3.5 py-2 rounded-xl border whitespace-nowrap transition <?= $statusFilter === 'draft' ? 'bg-amber-600 text-white border-amber-600 shadow-xs' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50' ?>">
         Bản nháp
     </a>
 </div>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
     <?php if (empty($transactions)): ?>
-        <div class="py-12 text-center text-slate-400">
+        <div class="py-12 text-center text-slate-400 px-4">
             Chưa có giao dịch nào phù hợp với bộ lọc.
         </div>
     <?php else: ?>
-        <div class="overflow-x-auto">
+        <!-- Giao diện Thẻ trên Mobile (< md) -->
+        <div class="md:hidden divide-y divide-slate-100">
+            <?php foreach ($transactions as $t): ?>
+                <div class="p-4 space-y-3">
+                    <div class="flex items-start justify-between gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 rounded-lg bg-slate-100 text-slate-600 font-mono font-bold text-xs">
+                                #<?= $t['id'] ?>
+                            </span>
+                            <a href="transaction_detail.php?id=<?= $t['id'] ?>" class="font-bold text-slate-900 text-sm hover:text-emerald-700 transition">
+                                <?= htmlspecialchars($t['title']) ?>
+                            </a>
+                        </div>
+                        <?php if ($t['status'] === 'completed'): ?>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-800 flex-shrink-0">
+                                Hoàn thành
+                            </span>
+                        <?php elseif ($t['status'] === 'draft'): ?>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800 flex-shrink-0">
+                                Bản nháp
+                            </span>
+                        <?php else: ?>
+                            <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-600 flex-shrink-0">
+                                Đã hủy
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
+                    <?php if (!empty($t['note'])): ?>
+                        <p class="text-xs text-slate-400 line-clamp-2"><?= htmlspecialchars($t['note']) ?></p>
+                    <?php endif; ?>
+
+                    <div class="flex items-center justify-between text-xs pt-1">
+                        <div class="text-slate-500">
+                            Người trả: <span class="font-bold text-emerald-700"><?= htmlspecialchars($t['payer_name']) ?></span>
+                        </div>
+                        <div class="text-slate-400 text-[11px]">
+                            <?= htmlspecialchars(substr($t['created_at'], 0, 16)) ?>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <span class="text-base font-black text-slate-900"><?= number_format($t['total_amount']) ?> đ</span>
+                        <div class="flex items-center space-x-1.5">
+                            <a href="transaction_detail.php?id=<?= $t['id'] ?>" class="px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition border border-emerald-200">
+                                Chi tiết
+                            </a>
+                            <a href="transaction_edit.php?id=<?= $t['id'] ?>" class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition border border-slate-200">
+                                Sửa
+                            </a>
+                            <form method="POST" action="transactions.php" class="inline" onsubmit="return confirm('Bạn có chắc muốn xóa giao dịch #<?= $t['id'] ?> này?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="<?= $t['id'] ?>">
+                                <button type="submit" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition border border-rose-200">
+                                    Xóa
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Giao diện Bảng trên Desktop (>= md) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase">
                     <tr>

@@ -78,13 +78,41 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
     <?php if (empty($settlements)): ?>
-        <div class="py-12 text-center text-slate-400">
+        <div class="py-12 text-center text-slate-400 px-4">
             Chưa có đợt gạch nợ nào được thực hiện.
         </div>
     <?php else: ?>
-        <div class="overflow-x-auto">
+        <!-- Giao diện Thẻ trên Mobile (< md) -->
+        <div class="md:hidden divide-y divide-slate-100">
+            <?php foreach ($settlements as $s): ?>
+                <div class="p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-1.5 text-xs font-bold text-slate-800">
+                            <span class="text-rose-700"><?= htmlspecialchars($s['debtor_name']) ?></span>
+                            <span class="text-slate-400 font-normal">&rarr;</span>
+                            <span class="text-emerald-700"><?= htmlspecialchars($s['creditor_name']) ?></span>
+                        </div>
+                        <span class="text-sm font-black text-emerald-600">
+                            +<?= number_format($s['amount']) ?> đ
+                        </span>
+                    </div>
+
+                    <?php if (!empty($s['note'])): ?>
+                        <p class="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100"><?= htmlspecialchars($s['note']) ?></p>
+                    <?php endif; ?>
+
+                    <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                        <span class="font-mono">#<?= $s['id'] ?></span>
+                        <span><?= htmlspecialchars(substr($s['settled_at'], 0, 16)) ?></span>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Giao diện Bảng trên Desktop (>= md) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase">
                     <tr>

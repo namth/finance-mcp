@@ -118,20 +118,20 @@ require_once __DIR__ . '/includes/header.php';
         </div>
     <?php endif; ?>
 
-    <form method="POST" action="transaction_create.php" id="txForm" class="space-y-6">
+    <form method="POST" action="transaction_create.php" id="txForm" class="space-y-4 sm:space-y-6">
         <!-- Khối 1: Thông tin chung hóa đơn -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3">1. Thông Tin Hóa Đơn</h2>
             
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tiêu Đề Chi Tiêu *</label>
-                    <input type="text" name="title" id="txTitle" required placeholder="Ví dụ: Ăn trưa bún đậu, Cafe sáng, Tiền phòng hát..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium">
+                    <input type="text" name="title" id="txTitle" required placeholder="Ví dụ: Ăn trưa bún đậu, Cafe sáng, Tiền phòng hát..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-medium">
                 </div>
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Người Đứng Ra Thanh Toán *</label>
-                    <select name="payer_id" required class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-bold text-emerald-800 bg-emerald-50/50">
+                    <select name="payer_id" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-bold text-emerald-800 bg-emerald-50/50">
                         <option value="">-- Chọn thành viên thanh toán --</option>
                         <?php foreach ($members as $m): ?>
                             <option value="<?= $m['id'] ?>"><?= htmlspecialchars($m['name']) ?> (<?= htmlspecialchars($m['phone'] ?: 'Không có SĐT') ?>)</option>
@@ -143,7 +143,7 @@ require_once __DIR__ . '/includes/header.php';
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Trạng Thái</label>
-                    <select name="status" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                    <select name="status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
                         <option value="completed" selected>Hoàn thành (Tự động tính nợ ngay)</option>
                         <option value="draft">Bản nháp (Chưa tính nợ)</option>
                     </select>
@@ -151,23 +151,23 @@ require_once __DIR__ . '/includes/header.php';
 
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
-                    <input type="text" name="note" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
+                    <input type="text" name="note" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
                 </div>
             </div>
         </div>
 
         <!-- Khối 2: Quán / Địa Điểm (Tùy chọn) -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
                 <div>
-                    <h2 class="text-base font-bold text-slate-900">2. Quán / Địa Điểm <span class="text-slate-400 font-normal text-xs">(Không bắt buộc)</span></h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Chọn quán để lọc đúng đơn giá món tại quán đó hoặc tạo nhanh quán mới</p>
+                    <h2 class="text-sm sm:text-base font-bold text-slate-900">2. Quán / Địa Điểm <span class="text-slate-400 font-normal text-xs">(Tùy chọn)</span></h2>
+                    <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Chọn quán để lọc đúng đơn giá món tại quán đó</p>
                 </div>
-                <button type="button" onclick="openQuickPlaceModal()" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-lg text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition shadow-2xs">
+                <button type="button" onclick="openQuickPlaceModal()" class="inline-flex items-center px-3 py-1.5 text-xs font-bold rounded-xl text-emerald-700 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 active:scale-95 transition shadow-2xs flex-shrink-0">
                     <svg class="w-3.5 h-3.5 mr-1 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
-                    Tạo Quán Mới
+                    Tạo Quán
                 </button>
             </div>
 
@@ -188,7 +188,7 @@ require_once __DIR__ . '/includes/header.php';
                         <svg class="w-3.5 h-3.5 mr-1 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                         </svg>
-                        + Thêm Món Cho Quán Này
+                        + Thêm Món Cho Quán
                     </button>
                 </div>
             </div>
@@ -211,13 +211,13 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Khối 3: Danh sách các món trong giao dịch -->
-        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+        <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3 gap-2">
                 <div>
-                    <h2 class="text-base font-bold text-slate-900">3. Chi Tiết Sản Phẩm & Phân Bổ Thành Viên</h2>
-                    <p class="text-xs text-slate-500 mt-0.5">Mỗi món có thể có nhiều người tham gia, tiền sẽ được chia đều tự động</p>
+                    <h2 class="text-sm sm:text-base font-bold text-slate-900">3. Chi Tiết Sản Phẩm & Phân Bổ</h2>
+                    <p class="text-[11px] sm:text-xs text-slate-500 mt-0.5">Tiền từng món sẽ được chia đều tự động cho người tham gia</p>
                 </div>
-                <button type="button" onclick="addItemRow()" class="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 transition">
+                <button type="button" onclick="addItemRow()" class="inline-flex items-center px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 active:scale-95 transition flex-shrink-0">
                     <svg class="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                     </svg>
@@ -232,11 +232,11 @@ require_once __DIR__ . '/includes/header.php';
         </div>
 
         <!-- Nút Submit -->
-        <div class="flex justify-end space-x-3 pt-2">
-            <a href="transactions.php" class="px-5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50 transition">
+        <div class="flex flex-col-reverse sm:flex-row justify-end gap-2.5 sm:space-x-3 pt-2">
+            <a href="transactions.php" class="w-full sm:w-auto text-center px-5 py-3 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 hover:bg-slate-50 active:scale-95 transition">
                 Hủy
             </a>
-            <button type="submit" class="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 transition">
+            <button type="submit" class="w-full sm:w-auto text-center px-6 py-3 rounded-xl text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 active:scale-95 transition">
                 Lưu & Cập Nhật Công Nợ
             </button>
         </div>
@@ -245,7 +245,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Modal 1: Tạo Nhanh Quán Mới -->
 <div id="quickPlaceModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 class="text-base font-bold text-slate-900">Tạo Quán / Địa Điểm Mới</h3>
             <button type="button" onclick="closeQuickPlaceModal()" class="text-slate-400 hover:text-slate-600 font-bold text-lg">&times;</button>
@@ -273,7 +273,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Modal 2: Thêm Món Mới Cho Quán Đang Chọn -->
 <div id="quickProductModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
                 <h3 class="text-base font-bold text-slate-900">Thêm Món Mới Cho Quán</h3>
@@ -284,11 +284,11 @@ require_once __DIR__ . '/includes/header.php';
         <form onsubmit="handleQuickProductSubmit(event)" class="space-y-3">
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Tên Món / Dịch Vụ *</label>
-                <input type="text" id="quickProductName" required placeholder="Ví dụ: Cà phê muối, Bạc xỉu..." class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-medium">
+                <input type="text" id="quickProductName" required placeholder="Ví dụ: Cà phê muối, Bạc xỉu..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-medium">
             </div>
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Đơn Giá Mặc Định (VNĐ)</label>
-                <input type="number" id="quickProductPrice" min="0" step="500" placeholder="Ví dụ: 35000" class="w-full px-3 py-2 rounded-xl border border-slate-300 text-sm font-bold text-emerald-800">
+                <input type="number" id="quickProductPrice" min="0" step="500" placeholder="Ví dụ: 35000" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 text-sm font-bold text-emerald-800">
             </div>
             <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
                 <button type="button" onclick="closeQuickProductModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">Hủy</button>
@@ -397,14 +397,14 @@ function addItemRow(preselectProdId = null, prefillPrice = null) {
 
     const card = document.createElement('div');
     card.id = `itemRow_${idx}`;
-    card.className = "p-4 rounded-xl border border-slate-200 bg-slate-50/60 space-y-3 relative";
+    card.className = "p-3.5 sm:p-5 rounded-2xl border border-slate-200 bg-slate-50/70 space-y-3 relative";
 
     const productOptions = buildProductOptions(preselectProdId);
 
     let memberCheckboxes = '';
     availableMembers.forEach(m => {
         memberCheckboxes += `
-            <label class="inline-flex items-center space-x-1.5 p-1.5 rounded-lg border border-slate-200 bg-white text-xs text-slate-700 cursor-pointer hover:border-emerald-300">
+            <label class="inline-flex items-center space-x-2 px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium text-slate-700 cursor-pointer hover:border-emerald-300 active:scale-95 transition min-h-[38px]">
                 <input type="checkbox" name="items[${idx}][members][]" value="${m.id}" checked class="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 member-cb-${idx}">
                 <span>${m.name}</span>
             </label>

@@ -97,13 +97,58 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 <?php endif; ?>
 
-<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+<div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-8">
     <?php if (empty($members)): ?>
-        <div class="py-12 text-center text-slate-400">
+        <div class="py-12 text-center text-slate-400 px-4">
             Chưa có thành viên nào trong hệ thống. Hãy nhấn "Thêm Thành Viên Mới" để bắt đầu.
         </div>
     <?php else: ?>
-        <div class="overflow-x-auto">
+        <!-- Giao diện Thẻ trên Mobile (< md) -->
+        <div class="md:hidden divide-y divide-slate-100">
+            <?php foreach ($members as $m): ?>
+                <div class="p-4 space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                                <?= mb_substr($m['name'], 0, 1, 'UTF-8') ?>
+                            </div>
+                            <div>
+                                <span class="font-bold text-slate-900 text-sm"><?= htmlspecialchars($m['name']) ?></span>
+                                <span class="text-[10px] text-slate-400 block font-mono">#<?= $m['id'] ?></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-1.5">
+                            <button type="button" 
+                                    onclick="openEditMemberModal(<?= $m['id'] ?>, '<?= htmlspecialchars(addslashes($m['name'])) ?>', '<?= htmlspecialchars(addslashes($m['phone'] ?? '')) ?>', '<?= htmlspecialchars(addslashes($m['email'] ?? '')) ?>')"
+                                    class="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-50 hover:bg-slate-100 rounded-xl transition border border-slate-200">
+                                Sửa
+                            </button>
+                            <form method="POST" action="members.php" class="inline" onsubmit="return confirm('Bạn có chắc muốn xóa thành viên <?= htmlspecialchars(addslashes($m['name'])) ?>?');">
+                                <input type="hidden" name="action" value="delete">
+                                <input type="hidden" name="id" value="<?= $m['id'] ?>">
+                                <button type="submit" class="px-2.5 py-1.5 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-xl transition border border-rose-200">
+                                    Xóa
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block uppercase font-semibold">SĐT:</span>
+                            <span class="text-slate-700 font-medium"><?= htmlspecialchars($m['phone'] ?: '—') ?></span>
+                        </div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block uppercase font-semibold">Email:</span>
+                            <span class="text-slate-700 font-medium truncate block"><?= htmlspecialchars($m['email'] ?: '—') ?></span>
+                        </div>
+                    </div>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <!-- Giao diện Bảng trên Desktop (>= md) -->
+        <div class="hidden md:block overflow-x-auto">
             <table class="min-w-full divide-y divide-slate-200 text-sm">
                 <thead class="bg-slate-50 text-slate-600 text-xs font-semibold uppercase">
                     <tr>
@@ -162,7 +207,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Modal Thêm / Sửa Thành Viên -->
 <div id="memberModal" class="fixed inset-0 z-50 hidden bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-200">
         <div class="flex items-center justify-between pb-3 border-b border-slate-100">
             <h3 class="text-base font-bold text-slate-900" id="modalTitle">Thêm Thành Viên Mới</h3>
             <button onclick="closeMemberModal()" class="text-slate-400 hover:text-slate-600">

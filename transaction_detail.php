@@ -73,41 +73,41 @@ require_once __DIR__ . '/includes/header.php';
 ?>
 
 <div class="max-w-4xl mx-auto mb-10">
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6">
         <div>
             <a href="transactions.php" class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center mb-1">
                 &larr; Danh sách giao dịch
             </a>
-            <div class="flex items-center space-x-3">
-                <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Hóa Đơn #<?= $tx['id'] ?>: <?= htmlspecialchars($tx['title']) ?></h1>
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Hóa Đơn #<?= $tx['id'] ?>: <?= htmlspecialchars($tx['title']) ?></h1>
                 <?php if ($tx['status'] === 'completed'): ?>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 flex-shrink-0">
                         Hoàn thành
                     </span>
                 <?php elseif ($tx['status'] === 'draft'): ?>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 flex-shrink-0">
                         Bản nháp
                     </span>
                 <?php else: ?>
-                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 flex-shrink-0">
                         Đã hủy
                     </span>
                 <?php endif; ?>
             </div>
         </div>
 
-        <div class="flex items-center space-x-2">
-            <a href="transaction_edit.php?id=<?= $tx['id'] ?>" class="inline-flex items-center px-3.5 py-2 text-xs font-bold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-emerald-700 shadow-xs transition">
+        <div class="flex items-center space-x-2 pt-1 sm:pt-0">
+            <a href="transaction_edit.php?id=<?= $tx['id'] ?>" class="inline-flex items-center px-3.5 py-2 text-xs font-bold rounded-xl text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 hover:text-emerald-700 shadow-xs active:scale-95 transition">
                 <svg class="w-3.5 h-3.5 mr-1.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                 </svg>
-                Sửa Toàn Bộ Giao Dịch
+                Sửa Toàn Bộ
             </a>
 
             <?php if ($tx['status'] === 'draft'): ?>
                 <form method="POST" action="transaction_detail.php?id=<?= $tx['id'] ?>">
                     <input type="hidden" name="action" value="complete">
-                    <button type="submit" class="px-4 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 transition">
+                    <button type="submit" class="px-3.5 py-2 text-xs font-bold rounded-xl text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 active:scale-95 transition">
                         Xác Nhận & Cập Nhật Nợ
                     </button>
                 </form>
@@ -134,11 +134,11 @@ require_once __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <!-- Thẻ Tổng Quan Hóa Đơn -->
-    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
+    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
         <div>
             <p class="text-xs font-semibold text-slate-400 uppercase">Người Đứng Ra Trả Tiền</p>
-            <p class="text-lg font-bold text-emerald-800 mt-1 flex items-center">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block mr-2"></span>
+            <p class="text-base sm:text-lg font-bold text-emerald-800 mt-1 flex items-center">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-600 inline-block mr-2 flex-shrink-0"></span>
                 <?= htmlspecialchars($tx['payer_name']) ?>
             </p>
             <p class="text-xs text-slate-400 mt-0.5"><?= htmlspecialchars($tx['payer_phone'] ?: 'Không có SĐT') ?></p>
@@ -146,7 +146,7 @@ require_once __DIR__ . '/includes/header.php';
 
         <div>
             <p class="text-xs font-semibold text-slate-400 uppercase">Tổng Số Tiền Hóa Đơn</p>
-            <p class="text-2xl font-black text-slate-900 mt-1"><?= number_format($tx['total_amount']) ?> <span class="text-sm font-normal text-slate-500">đ</span></p>
+            <p class="text-xl sm:text-2xl font-black text-slate-900 mt-1"><?= number_format($tx['total_amount']) ?> <span class="text-sm font-normal text-slate-500">đ</span></p>
             <p class="text-xs text-slate-400 mt-0.5"><?= count($tx['items']) ?> món / sản phẩm</p>
         </div>
 
@@ -247,14 +247,14 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 
     <!-- Bảng Tổng Kết Chi Phí Mỗi Người Cần Đóng Góp -->
-    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <h2 class="text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6">
+        <h2 class="text-sm sm:text-base font-bold text-slate-900 border-b border-slate-100 pb-3 mb-4">
             Tổng Hợp Phần Chi Phí Của Từng Người Trong Hóa Đơn
         </h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             <?php foreach ($memberTotals as $mId => $info): ?>
                 <?php $isPayer = ($mId === (int)$tx['payer_id']); ?>
-                <div class="p-4 rounded-xl border <?= $isPayer ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/50' ?>">
+                <div class="p-3.5 sm:p-4 rounded-xl border <?= $isPayer ? 'border-emerald-300 bg-emerald-50/40' : 'border-slate-200 bg-slate-50/50' ?>">
                     <div class="flex justify-between items-center mb-1">
                         <span class="font-bold text-sm text-slate-900"><?= htmlspecialchars($info['name']) ?></span>
                         <?php if ($isPayer): ?>
@@ -263,7 +263,7 @@ require_once __DIR__ . '/includes/header.php';
                             <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-rose-100 text-rose-700">Nợ người trả</span>
                         <?php endif; ?>
                     </div>
-                    <p class="text-lg font-black <?= $isPayer ? 'text-emerald-800' : 'text-rose-600' ?>">
+                    <p class="text-base sm:text-lg font-black <?= $isPayer ? 'text-emerald-800' : 'text-rose-600' ?>">
                         <?= number_format($info['amount']) ?> <span class="text-xs font-normal text-slate-500">đ</span>
                     </p>
                 </div>
@@ -274,7 +274,7 @@ require_once __DIR__ . '/includes/header.php';
 
 <!-- Modal sửa giá nhanh cho món -->
 <div id="editPriceModal" class="hidden fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
         <div class="flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
                 <h3 class="text-base font-bold text-slate-900" id="modalItemTitle">Sửa Giá Món</h3>
@@ -289,12 +289,12 @@ require_once __DIR__ . '/includes/header.php';
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Đơn Giá Mới (VNĐ) *</label>
-                <input type="number" name="new_price" id="modalNewPrice" required min="0" step="500" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-bold text-emerald-800">
+                <input type="number" name="new_price" id="modalNewPrice" required min="0" step="500" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-base font-bold text-emerald-800">
             </div>
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Số Lượng *</label>
-                <input type="number" name="new_quantity" id="modalNewQty" required min="1" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-semibold text-slate-800">
+                <input type="number" name="new_quantity" id="modalNewQty" required min="1" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-semibold text-slate-800">
             </div>
 
             <p class="text-[11px] text-slate-400">
@@ -305,7 +305,7 @@ require_once __DIR__ . '/includes/header.php';
                 <button type="button" onclick="closeEditPriceModal()" class="px-4 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50">
                     Hủy
                 </button>
-                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-md shadow-emerald-600/20">
+                <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-xs font-bold text-white shadow-md shadow-emerald-600/20 active:scale-95 transition">
                     Lưu Thay Đổi
                 </button>
             </div>

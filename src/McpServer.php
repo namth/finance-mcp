@@ -388,6 +388,32 @@ class McpServer
                         throw new \InvalidArgumentException("Giao dịch #{$id} không thuộc nhóm chi tiêu của bạn.");
                     }
 
+                    // Nếu caller truyền sửa giá của một món cụ thể ngay trong transaction_update
+                    if (isset($args['price']) && (!empty($args['item_id']) || !empty($args['product_name']) || !empty($args['product_id'])) && !isset($args['items'])) {
+                        $itemId = (int)($args['item_id'] ?? 0);
+                        $productName = trim((string)($args['product_name'] ?? ''));
+                        $productId = (int)($args['product_id'] ?? 0);
+
+                        if ($itemId <= 0) {
+                            foreach ($oldTx['items'] as $it) {
+                                if ($productId > 0 && (int)$it['product_id'] === $productId) {
+                                    $itemId = (int)$it['id'];
+                                    break;
+                                }
+                                if (!empty($productName) && mb_stripos($it['product_name'], $productName) !== false) {
+                                    $itemId = (int)$it['id'];
+                                    break;
+                                }
+                            }
+                        }
+
+                        if ($itemId > 0) {
+                            $newPrice = (float)$args['price'];
+                            $newQuantity = isset($args['quantity']) && (int)$args['quantity'] > 0 ? (int)$args['quantity'] : null;
+                            $txModel->updateItemPrice($id, $itemId, $newPrice, $newQuantity);
+                        }
+                    }
+
                     $updatedTx = $txModel->update($id, $args, $groupId);
                     if (!$updatedTx) {
                         throw new \InvalidArgumentException("Không thể cập nhật giao dịch #{$id}.");
@@ -405,6 +431,72 @@ class McpServer
                     return [
                         'success'            => true,
                         'message'            => "Đã cập nhật giao dịch #{$id} thành công" . ($debtsRecalculated ? " và tự động tính toán lại công nợ của nhóm." : "."),
+                        'summary_text'       => $splitSummary['summary_text'],
+                        'split_summary'      => $splitSummary,
+                        'transaction'        => $updatedTx,
+                        'group_id'           => $groupId,
+                        'debts_recalculated' => $debtsRecalculated,
+                    ];
+                })(),
+
+                'transaction_item_update' => (function () use ($txModel, $debtManager, $args) {
+                    $transactionId = (int)($args['transaction_id'] ?? $args['id'] ?? 0);
+                    if ($transactionId <= 0) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp ID giao dịch (transaction_id).");
+                    }
+                    $groupId = $this->getEffectiveGroupId($args);
+
+                    $tx = $txModel->find($transactionId);
+                    if (!$tx) {
+                        throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$transactionId}");
+                    }
+                    if ((int)$tx['group_id'] !== $groupId) {
+                        throw new \InvalidArgumentException("Giao dịch #{$transactionId} không thuộc nhóm chi tiêu của bạn.");
+                    }
+
+                    // Tìm item_id trong transaction:
+                    $itemId = (int)($args['item_id'] ?? 0);
+                    $productName = trim((string)($args['product_name'] ?? ''));
+                    $productId = (int)($args['product_id'] ?? 0);
+
+                    if ($itemId <= 0) {
+                        // Tìm theo product_id hoặc product_name trong danh sách items của tx
+                        foreach ($tx['items'] as $it) {
+                            if ($productId > 0 && (int)$it['product_id'] === $productId) {
+                                $itemId = (int)$it['id'];
+                                break;
+                            }
+                            if (!empty($productName) && mb_stripos($it['product_name'], $productName) !== false) {
+                                $itemId = (int)$it['id'];
+                                break;
+                            }
+                        }
+                    }
+
+                    if ($itemId <= 0) {
+                        throw new \InvalidArgumentException("Không tìm thấy món cần sửa trong giao dịch #{$transactionId}. Vui lòng cung cấp item_id, product_name hoặc product_id chính xác.");
+                    }
+
+                    if (!isset($args['price'])) {
+                        throw new \InvalidArgumentException("Vui lòng nhập đơn giá mới (price).");
+                    }
+                    $newPrice = (float)$args['price'];
+                    $newQuantity = isset($args['quantity']) && (int)$args['quantity'] > 0 ? (int)$args['quantity'] : null;
+
+                    $txModel->updateItemPrice($transactionId, $itemId, $newPrice, $newQuantity);
+
+                    $debtsRecalculated = false;
+                    if ($tx['status'] === 'completed') {
+                        $debtManager->recalculateAll($groupId);
+                        $debtsRecalculated = true;
+                    }
+
+                    $updatedTx = $txModel->find($transactionId);
+                    $splitSummary = $this->buildTransactionSplitSummary($updatedTx);
+
+                    return [
+                        'success'            => true,
+                        'message'            => "Đã cập nhật giá món trong giao dịch #{$transactionId} thành công" . ($debtsRecalculated ? " và tự động tính toán lại công nợ của nhóm." : "."),
                         'summary_text'       => $splitSummary['summary_text'],
                         'split_summary'      => $splitSummary,
                         'transaction'        => $updatedTx,
@@ -794,6 +886,23 @@ class McpServer
                         ],
                     ],
                     'required' => ['id'],
+                ],
+            ],
+            'transaction_item_update' => [
+                'name' => 'transaction_item_update',
+                'description' => 'Sửa nhanh đơn giá (price) hoặc số lượng (quantity) của một món/sản phẩm cụ thể trong giao dịch (ví dụ: lỡ nhập 30k muốn sửa lại thành 15k). Hệ thống sẽ TỰ ĐỘNG tính lại thành tiền của món, tự động chia đều lại số tiền cho các thành viên cùng dùng món đó, cập nhật tổng hóa đơn và tự động tính lại công nợ.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'transaction_id' => ['type' => 'integer', 'description' => 'ID giao dịch chứa món cần sửa'],
+                        'item_id'        => ['type' => 'integer', 'description' => 'ID của món trong giao dịch (tùy chọn nếu truyền product_name hoặc product_id)'],
+                        'product_name'   => ['type' => 'string', 'description' => 'Tên món cần sửa (nếu không nhớ item_id, hệ thống sẽ tự động tìm kiếm món theo tên)'],
+                        'product_id'     => ['type' => 'integer', 'description' => 'ID sản phẩm của món cần sửa (tùy chọn)'],
+                        'price'          => ['type' => 'number', 'description' => 'Đơn giá mới thực tế của món (ví dụ: 15000)'],
+                        'quantity'       => ['type' => 'integer', 'description' => 'Số lượng mới (tùy chọn, nếu để trống sẽ giữ nguyên số lượng cũ)'],
+                        'group_id'       => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                    ],
+                    'required' => ['transaction_id', 'price'],
                 ],
             ],
             'transaction_delete' => [

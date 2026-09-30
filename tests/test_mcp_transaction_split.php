@@ -155,8 +155,60 @@ foreach ($debtData as $d) {
 assert($debtsFound === 2, "Bảng nợ phải ghi nhận Bình nợ 35k và An nợ 20k");
 echo "✓ Bảng công nợ khớp chính xác với kết quả tự động tính toán!\n";
 
-// 4. Test transaction_update: cập nhật giá món và chỉ định thành viên mới
+// 3.5 Test transaction_item_update: sửa giá món lẻ (từ 30k thành 15k)
 $txId = $resData['transaction']['id'];
+$itemUpdateRes = $server->handleRequest([
+    'jsonrpc' => '2.0',
+    'id' => 35,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'transaction_item_update',
+        'arguments' => [
+            'transaction_id' => $txId,
+            'product_name'   => 'Cà phê đá',
+            'price'          => 15000,
+        ],
+    ],
+]);
+assert(empty($itemUpdateRes['result']['isError']), "transaction_item_update phải thành công");
+$itemUpdateData = json_decode($itemUpdateRes['result']['content'][0]['text'], true);
+assert($itemUpdateData['success'] === true, "success phải true");
+assert($itemUpdateData['split_summary']['total_amount'] == 75000, "Tổng tiền mới sau khi sửa từ 30k về 15k phải là 75,000đ");
+
+// Nam: 7.5k + 20k = 27.5k, Bình: 7.5k + 20k = 27.5k, An: 20k
+$newShares = $itemUpdateData['split_summary']['member_shares'];
+$newShareByMember = [];
+foreach ($newShares as $s) {
+    $newShareByMember[$s['member_id']] = $s['total_share'];
+}
+assert($newShareByMember[1] == 27500, "Nam phải là 27500");
+assert($newShareByMember[2] == 27500, "Bình phải là 27500");
+assert($newShareByMember[3] == 20000, "An phải là 20000");
+echo "✓ transaction_item_update sửa giá món từ 30k về 15k thành công (Tổng mới: 75.000đ, Bình nợ mới: 27.500đ)\n";
+echo "--- Báo cáo sau khi sửa giá món ---\n";
+echo $itemUpdateData['summary_text'] . "\n";
+echo "-----------------------------------\n";
+
+// 3.6 Test sửa giá qua transaction_update trực tiếp
+$updateDirectRes = $server->handleRequest([
+    'jsonrpc' => '2.0',
+    'id' => 36,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'transaction_update',
+        'arguments' => [
+            'id'           => $txId,
+            'product_name' => 'Cà phê đá',
+            'price'        => 20000,
+        ],
+    ],
+]);
+assert(empty($updateDirectRes['result']['isError']), "transaction_update sửa giá đơn lẻ phải thành công");
+$updateDirectData = json_decode($updateDirectRes['result']['content'][0]['text'], true);
+assert($updateDirectData['split_summary']['total_amount'] == 80000, "Tổng tiền sau khi sửa lên 20k phải là 80k");
+echo "✓ transaction_update sửa giá món đơn lẻ cũng hoạt động trơn tru (Tổng mới: 80.000đ)!\n";
+
+// 4. Test transaction_update: cập nhật lại danh sách toàn bộ món
 $updateRes = $server->handleRequest([
     'jsonrpc' => '2.0',
     'id' => 4,

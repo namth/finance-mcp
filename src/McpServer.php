@@ -196,7 +196,44 @@ class McpServer
 
                 'product_list' => (function () use ($productModel, $args) {
                     $groupId = $this->getEffectiveGroupId($args);
-                    return $productModel->all($groupId);
+                    $placeModel = new \SimpleFinance\Models\Place();
+
+                    $placeId = isset($args['place_id']) && (int)$args['place_id'] > 0 ? (int)$args['place_id'] : null;
+                    $placeName = isset($args['place_name']) ? (string)$args['place_name'] : null;
+                    $placeAddress = isset($args['place_address']) ? (string)$args['place_address'] : null;
+                    $placeQuery = isset($args['place']) ? (string)$args['place'] : null;
+                    $search = isset($args['name']) ? (string)$args['name'] : (isset($args['search']) ? (string)$args['search'] : null);
+
+                    $matchedPlace = null;
+                    $hasPlaceFilter = ($placeId !== null || $placeName !== null || $placeAddress !== null || $placeQuery !== null);
+
+                    if ($hasPlaceFilter) {
+                        $matchedPlace = $placeModel->resolvePlace($placeId, $placeName, $placeAddress, $placeQuery, $groupId);
+                    }
+
+                    if ($matchedPlace) {
+                        // Xác định được quán: lấy toàn bộ danh sách sản phẩm trong quán đó ra (kèm lọc theo tên món nếu có)
+                        $products = $productModel->all($groupId, (int)$matchedPlace['id'], $search);
+                        return [
+                            'place_identified' => $matchedPlace,
+                            'filter_mode'      => 'by_place',
+                            'message'          => "Đã xác định quán '{$matchedPlace['name']}'" . ($matchedPlace['address'] ? " ({$matchedPlace['address']})" : "") . " và lấy danh sách sản phẩm thuộc quán này.",
+                            'total'            => count($products),
+                            'products'         => $products,
+                        ];
+                    } else {
+                        // Không xác định quán: lấy danh sách sản phẩm phù hợp trong nhóm
+                        $products = $productModel->all($groupId, null, $search);
+                        return [
+                            'place_identified' => null,
+                            'filter_mode'      => 'group_fallback',
+                            'message'          => $hasPlaceFilter
+                                ? "Không tìm thấy quán phù hợp trong hệ thống, tự động lấy danh sách sản phẩm trong nhóm."
+                                : "Danh sách sản phẩm trong nhóm.",
+                            'total'            => count($products),
+                            'products'         => $products,
+                        ];
+                    }
                 })(),
 
                 'product_get' => (function () use ($productModel, $args) {
@@ -520,11 +557,16 @@ class McpServer
             ],
             'product_list' => [
                 'name' => 'product_list',
-                'description' => 'Lấy danh sách tất cả các sản phẩm và dịch vụ trong nhóm.',
+                'description' => 'Lấy danh sách sản phẩm/dịch vụ. Hỗ trợ xác định Quán/Địa điểm: Nếu xác định được quán thì sẽ lấy tất cả danh sách sản phẩm trong quán đó ra (với đúng giá tiền tại quán đó). Nếu không xác định quán thì sẽ lấy danh sách sản phẩm phù hợp trong nhóm.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
-                        'group_id' => ['type' => 'integer', 'description' => 'ID nhóm (tùy chọn)'],
+                        'group_id'      => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                        'place'         => ['type' => 'string', 'description' => 'Tên hoặc địa chỉ quán để hệ thống tự nhận diện (ví dụ: "Mai Chí Thọ", "The Coffee House", "Highlands")'],
+                        'place_id'      => ['type' => 'integer', 'description' => 'ID cụ thể của quán nếu biết (tùy chọn)'],
+                        'place_name'    => ['type' => 'string', 'description' => 'Tên quán (tùy chọn)'],
+                        'place_address' => ['type' => 'string', 'description' => 'Địa chỉ hoặc khu vực của quán (tùy chọn, ví dụ: đường Mai Chí Thọ)'],
+                        'name'          => ['type' => 'string', 'description' => 'Lọc theo tên sản phẩm/dịch vụ (tùy chọn, ví dụ: "cà phê", "trà đào")'],
                     ],
                 ],
             ],

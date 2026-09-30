@@ -265,4 +265,100 @@ $debtsAfterDel = $debtManager->getSummary(null, $gid);
 assert(count($debtsAfterDel) === 0, "Sau khi xóa giao dịch, công nợ phải về 0");
 echo "✓ transaction_delete thành công: Đã xóa giao dịch và công nợ tự động về 0\n";
 
+// 8. Test MCP Server: product_list với bộ lọc quán (Place Resolution & Filtering)
+echo "\n--- TEST PRODUCT_LIST WITH PLACE FILTERING ---\n";
+
+// 8.1. Lọc theo quán Mai Chí Thọ: phải ra giá 35,000đ của quán Mai Chí Thọ
+$listReqMCT = [
+    'jsonrpc' => '2.0',
+    'id' => 4,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'product_list',
+        'arguments' => [
+            'group_id' => $gid,
+            'place' => 'Mai Chí Thọ',
+        ]
+    ]
+];
+$resMCT = $server->handleRequest($listReqMCT);
+assert($resMCT['result']['isError'] === false);
+$dataMCT = json_decode($resMCT['result']['content'][0]['text'], true);
+assert($dataMCT['filter_mode'] === 'by_place');
+assert($dataMCT['place_identified']['id'] === $place1['id']);
+assert(count($dataMCT['products']) >= 1);
+$foundMCT = false;
+foreach ($dataMCT['products'] as $p) {
+    if ($p['name'] === 'Cà phê sữa đá') {
+        assert((float)$p['default_price'] === 35000.0, "Giá ở Mai Chí Thọ phải là 35,000đ");
+        $foundMCT = true;
+    }
+}
+assert($foundMCT);
+echo "✓ product_list xác định quán Mai Chí Thọ thành công: lấy đúng sản phẩm với giá 35,000đ\n";
+
+// 8.2. Lọc theo quán Đồng Khởi: phải ra giá 45,000đ của quán Đồng Khởi
+$listReqDK = [
+    'jsonrpc' => '2.0',
+    'id' => 5,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'product_list',
+        'arguments' => [
+            'group_id' => $gid,
+            'place' => 'Đồng Khởi',
+        ]
+    ]
+];
+$resDK = $server->handleRequest($listReqDK);
+assert($resDK['result']['isError'] === false);
+$dataDK = json_decode($resDK['result']['content'][0]['text'], true);
+assert($dataDK['filter_mode'] === 'by_place');
+assert($dataDK['place_identified']['id'] === $place2['id']);
+assert(count($dataDK['products']) === 1);
+assert((float)$dataDK['products'][0]['default_price'] === 45000.0, "Giá ở Đồng Khởi phải là 45,000đ");
+echo "✓ product_list xác định quán Đồng Khởi thành công: lấy đúng sản phẩm với giá 45,000đ\n";
+
+// 8.3. Không xác định được quán (quán không tồn tại) -> fallback lấy danh sách sản phẩm phù hợp trong nhóm
+$listReqUnknown = [
+    'jsonrpc' => '2.0',
+    'id' => 6,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'product_list',
+        'arguments' => [
+            'group_id' => $gid,
+            'place' => 'Quán Vỉa Hè Không Tồn Tại',
+        ]
+    ]
+];
+$resUnknown = $server->handleRequest($listReqUnknown);
+assert($resUnknown['result']['isError'] === false);
+$dataUnknown = json_decode($resUnknown['result']['content'][0]['text'], true);
+assert($dataUnknown['filter_mode'] === 'group_fallback');
+assert($dataUnknown['place_identified'] === null);
+assert(count($dataUnknown['products']) >= 2, "Fallback phải trả về toàn bộ sản phẩm trong nhóm");
+echo "✓ product_list không xác định được quán -> Fallback lấy danh sách sản phẩm trong nhóm thành công\n";
+
+// 8.4. Lọc theo tên sản phẩm kết hợp quán
+$listReqFilter = [
+    'jsonrpc' => '2.0',
+    'id' => 7,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'product_list',
+        'arguments' => [
+            'group_id' => $gid,
+            'place' => 'Mai Chí Thọ',
+            'name' => 'Bạc xỉu',
+        ]
+    ]
+];
+$resFilter = $server->handleRequest($listReqFilter);
+assert($resFilter['result']['isError'] === false);
+$dataFilter = json_decode($resFilter['result']['content'][0]['text'], true);
+assert(count($dataFilter['products']) === 1);
+assert($dataFilter['products'][0]['name'] === 'Bạc xỉu đặc biệt');
+echo "✓ product_list kết hợp lọc quán và tên sản phẩm thành công\n";
+
 echo "\n>>> TẤT CẢ CÁC BÀI TEST ĐÃ VƯỢT QUA XUẤT SẮC! <<<\n";

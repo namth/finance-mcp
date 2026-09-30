@@ -182,4 +182,100 @@ class Place
         $stmt = $this->db->prepare("DELETE FROM `places` WHERE `id` = :id");
         return $stmt->execute([':id' => $id]);
     }
+
+    /**
+     * Tìm quán phù hợp nhất trong nhóm dựa trên ID, tên, địa chỉ hoặc từ khóa tìm kiếm
+     * Thứ tự ưu tiên:
+     * 1. Tìm chính xác theo place_id (nếu có)
+     * 2. Khớp cả tên quán và địa chỉ quán
+     * 3. Khớp địa chỉ quán ("chỉ khớp địa điểm thì cũng được")
+     * 4. Khớp tên quán
+     * 5. Khớp từ khóa tìm kiếm chung (trong tên hoặc địa chỉ)
+     *
+     * @param int|null $placeId ID quán cụ thể
+     * @param string|null $name Tên quán cần tìm
+     * @param string|null $address Địa chỉ / vị trí quán cần tìm
+     * @param string|null $query Từ khóa tìm kiếm quán (tên hoặc địa chỉ)
+     * @param int $groupId ID nhóm
+     * @return array|null Trả về thông tin quán tìm được, hoặc null nếu không xác định được quán
+     */
+    public function resolvePlace(
+        ?int $placeId = null,
+        ?string $name = null,
+        ?string $address = null,
+        ?string $query = null,
+        int $groupId = 1
+    ): ?array {
+        if ($placeId !== null && $placeId > 0) {
+            $p = $this->find($placeId);
+            if ($p && (int)$p['group_id'] === $groupId) {
+                return $p;
+            }
+        }
+
+        $allPlaces = $this->all($groupId);
+        if (empty($allPlaces)) {
+            return null;
+        }
+
+        $cleanName = ($name !== null && trim($name) !== '') ? trim($name) : null;
+        $cleanAddr = ($address !== null && trim($address) !== '') ? trim($address) : null;
+        $cleanQuery = ($query !== null && trim($query) !== '') ? trim($query) : null;
+
+        // Nếu người dùng truyền query nhưng không truyền name/address cụ thể
+        if ($cleanQuery !== null && $cleanName === null && $cleanAddr === null) {
+            $cleanAddr = $cleanQuery;
+            $cleanName = $cleanQuery;
+        }
+
+        // 1. Khớp cả tên quán và địa chỉ quán
+        if ($cleanName !== null && $cleanAddr !== null && $cleanName !== $cleanAddr) {
+            foreach ($allPlaces as $pl) {
+                $pName = (string)($pl['name'] ?? '');
+                $pAddr = (string)($pl['address'] ?? '');
+                if (
+                    ($pName !== '' && (mb_stripos($pName, $cleanName) !== false || mb_stripos($cleanName, $pName) !== false)) &&
+                    ($pAddr !== '' && (mb_stripos($pAddr, $cleanAddr) !== false || mb_stripos($cleanAddr, $pAddr) !== false))
+                ) {
+                    return $pl;
+                }
+            }
+        }
+
+        // 2. Ưu tiên khớp theo địa chỉ quán ("ưu tiên lấy theo địa điểm của quán... nếu như là chỉ khớp địa điểm thì cũng được")
+        if ($cleanAddr !== null) {
+            foreach ($allPlaces as $pl) {
+                $pAddr = (string)($pl['address'] ?? '');
+                if ($pAddr !== '' && (mb_stripos($pAddr, $cleanAddr) !== false || mb_stripos($cleanAddr, $pAddr) !== false)) {
+                    return $pl;
+                }
+            }
+        }
+
+        // 3. Khớp theo tên quán
+        if ($cleanName !== null) {
+            foreach ($allPlaces as $pl) {
+                $pName = (string)($pl['name'] ?? '');
+                if ($pName !== '' && (mb_stripos($pName, $cleanName) !== false || mb_stripos($cleanName, $pName) !== false)) {
+                    return $pl;
+                }
+            }
+        }
+
+        // 4. Khớp từ khóa chung trong cả name hoặc address của quán
+        if ($cleanQuery !== null) {
+            foreach ($allPlaces as $pl) {
+                $pName = (string)($pl['name'] ?? '');
+                $pAddr = (string)($pl['address'] ?? '');
+                if (
+                    ($pName !== '' && (mb_stripos($pName, $cleanQuery) !== false || mb_stripos($cleanQuery, $pName) !== false)) ||
+                    ($pAddr !== '' && (mb_stripos($pAddr, $cleanQuery) !== false || mb_stripos($cleanQuery, $pAddr) !== false))
+                ) {
+                    return $pl;
+                }
+            }
+        }
+
+        return null;
+    }
 }

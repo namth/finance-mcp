@@ -51,22 +51,38 @@ class Product
         return $this->find($id);
     }
 
-    public function all(?int $groupId = null): array
+    public function all(?int $groupId = null, ?int $placeId = null, ?string $search = null): array
     {
         $sql = "
             SELECT p.*, pl.name AS place_name, pl.address AS place_address
             FROM `products` p
             LEFT JOIN `places` pl ON p.place_id = pl.id
         ";
+        $conditions = [];
+        $params = [];
+
         if ($groupId !== null) {
-            $sql .= " WHERE p.group_id = :gid ORDER BY p.id ASC";
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([':gid' => $groupId]);
-            return $stmt->fetchAll();
+            $conditions[] = "p.group_id = :gid";
+            $params[':gid'] = $groupId;
+        }
+
+        if ($placeId !== null) {
+            $conditions[] = "p.place_id = :place_id";
+            $params[':place_id'] = $placeId;
+        }
+
+        if ($search !== null && trim($search) !== '') {
+            $conditions[] = "(LOWER(p.name) LIKE :search OR LOWER(COALESCE(p.description, '')) LIKE :search)";
+            $params[':search'] = '%' . strtolower(trim($search)) . '%';
+        }
+
+        if (!empty($conditions)) {
+            $sql .= " WHERE " . implode(' AND ', $conditions);
         }
 
         $sql .= " ORDER BY p.id ASC";
-        $stmt = $this->db->query($sql);
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
         return $stmt->fetchAll();
     }
 

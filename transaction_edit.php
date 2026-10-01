@@ -88,12 +88,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $oldStatus = $tx['status'];
+        $spentAt = !empty($_POST['spent_at']) ? trim((string)$_POST['spent_at']) : null;
 
         $txModel->update($id, [
             'title'    => $title,
             'payer_id' => $payerId,
             'place_id' => $placeId,
             'status'   => $status,
+            'spent_at' => $spentAt,
             'note'     => $note ?: null,
             'items'    => $items,
         ], $currentGroupId);
@@ -183,6 +185,17 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                        Ngày Phát Sinh Chi Tiêu *
+                        <span class="text-[10px] lowercase font-normal text-slate-400">(ngày thực tế diễn ra)</span>
+                    </label>
+                    <?php 
+                    $curSpentAt = $_POST['spent_at'] ?? (!empty($tx['spent_at']) ? date('Y-m-d', strtotime($tx['spent_at'])) : date('Y-m-d', strtotime($tx['created_at'])));
+                    ?>
+                    <input type="date" name="spent_at" required value="<?= htmlspecialchars($curSpentAt) ?>" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-semibold text-slate-800">
+                </div>
+
+                <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Trạng Thái</label>
                     <?php $curStatus = (string)($_POST['status'] ?? $tx['status']); ?>
                     <select name="status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
@@ -191,11 +204,11 @@ require_once __DIR__ . '/includes/header.php';
                         <option value="cancelled" <?= $curStatus === 'cancelled' ? 'selected' : '' ?>>Đã hủy (Hủy bỏ công nợ liên quan)</option>
                     </select>
                 </div>
+            </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
-                    <input type="text" name="note" value="<?= htmlspecialchars($_POST['note'] ?? ($tx['note'] ?? '')) ?>" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
+                <input type="text" name="note" value="<?= htmlspecialchars($_POST['note'] ?? ($tx['note'] ?? '')) ?>" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
         </div>
 

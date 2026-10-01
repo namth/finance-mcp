@@ -172,9 +172,12 @@ class McpServer
             ];
         }
 
+        $spentAtRaw = $tx['spent_at'] ?? $tx['created_at'] ?? null;
+        $spentAtFormatted = $spentAtRaw ? date('d/m/Y', strtotime($spentAtRaw)) : date('d/m/Y');
+
         // Tạo văn bản tóm tắt rõ ràng bằng tiếng Việt cho người dùng/AI
         $lines = [];
-        $lines[] = "🧾 Giao dịch: \"{$title}\"" . ($placeName ? " tại {$placeName}" . ($placeAddress ? " ({$placeAddress})" : "") : "");
+        $lines[] = "🧾 Giao dịch: \"{$title}\" (Ngày chi: {$spentAtFormatted})" . ($placeName ? " tại {$placeName}" . ($placeAddress ? " ({$placeAddress})" : "") : "");
         $lines[] = "💰 Tổng hóa đơn: " . number_format($totalAmount, 0, ',', '.') . " đ";
         $lines[] = "👤 Người thanh toán: {$payerName} (đã thanh toán toàn bộ " . number_format($totalAmount, 0, ',', '.') . " đ)";
         $lines[] = "📊 Kết quả hệ thống tự động phân chia tiền:";
@@ -203,6 +206,7 @@ class McpServer
             'total_amount'    => $totalAmount,
             'payer_id'        => $payerId,
             'payer_name'      => $payerName,
+            'spent_at'        => $spentAtRaw,
             'member_shares'   => array_values($memberShares),
             'items_breakdown' => $itemsBreakdown,
             'summary_text'    => implode("\n", $lines),
@@ -355,9 +359,10 @@ class McpServer
                     $note = isset($args['note']) ? (string)$args['note'] : null;
                     $placeName = isset($args['place_name']) ? (string)$args['place_name'] : null;
                     $placeAddress = isset($args['place_address']) ? (string)$args['place_address'] : null;
+                    $spentAt = isset($args['spent_at']) ? (string)$args['spent_at'] : null;
                     $groupId = $this->getEffectiveGroupId($args);
 
-                    $tx = $txModel->create($title, $payerId, $items, $status, $note, $groupId, $placeName, $placeAddress);
+                    $tx = $txModel->create($title, $payerId, $items, $status, $note, $groupId, $placeName, $placeAddress, null, $spentAt);
 
                     if ($status === 'completed') {
                         $debtManager->processTransaction((int)$tx['id']);
@@ -377,7 +382,7 @@ class McpServer
                 })(),
 
                 'transaction_update' => (function () use ($txModel, $debtManager, $args) {
-                    $id = (int)($args['id'] ?? 0);
+                    $id = (int)($args['id'] ?? $args['transaction_id'] ?? 0);
                     $groupId = $this->getEffectiveGroupId($args);
 
                     $oldTx = $txModel->find($id);
@@ -936,6 +941,7 @@ class McpServer
                             'description' => 'Trạng thái giao dịch. Mặc định là "completed" (tính nợ ngay)',
                             'default'     => 'completed',
                         ],
+                        'spent_at'      => ['type' => 'string', 'description' => 'Ngày/thời gian thực tế phát sinh chi tiêu (định dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm:ss, ví dụ: "2026-09-28"). Nếu để trống sẽ mặc định là thời điểm hiện tại.'],
                         'note'          => ['type' => 'string', 'description' => 'Ghi chú thêm về giao dịch'],
                         'items'         => [
                             'type'        => 'array',
@@ -965,7 +971,7 @@ class McpServer
             ],
             'transaction_update' => [
                 'name' => 'transaction_update',
-                'description' => 'Cập nhật hoặc sửa thông tin giao dịch (đổi giá sản phẩm, sửa người trả tiền, thay đổi danh sách món, đổi thành viên tham gia, đổi trạng thái). Hệ thống sẽ TỰ ĐỘNG tính toán lại số tiền phân bổ cho từng thành viên và tự động tính toán lại toàn bộ bảng công nợ của nhóm.',
+                'description' => 'Cập nhật hoặc sửa thông tin giao dịch (đổi giá sản phẩm, sửa người trả tiền, thay đổi danh sách món, đổi thành viên tham gia, đổi ngày chi tiêu thực tế, đổi trạng thái). Hệ thống sẽ TỰ ĐỘNG tính toán lại số tiền phân bổ cho từng thành viên và tự động tính toán lại toàn bộ bảng công nợ của nhóm.',
                 'inputSchema' => [
                     'type' => 'object',
                     'properties' => [
@@ -975,6 +981,7 @@ class McpServer
                         'group_id'      => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
                         'place_name'    => ['type' => 'string', 'description' => 'Tên quán/địa điểm mới (tùy chọn)'],
                         'place_address' => ['type' => 'string', 'description' => 'Địa chỉ quán mới (tùy chọn)'],
+                        'spent_at'      => ['type' => 'string', 'description' => 'Ngày/thời gian thực tế phát sinh chi tiêu mới (ví dụ: "2026-09-28")'],
                         'status'        => [
                             'type'        => 'string',
                             'enum'        => ['draft', 'completed', 'cancelled'],

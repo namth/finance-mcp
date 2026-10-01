@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS `transactions` (
     `total_amount` DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
     `status` ENUM('draft', 'completed', 'cancelled') NOT NULL DEFAULT 'draft',
     `note` TEXT DEFAULT NULL,
+    `spent_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT 'Ngày/giờ thực tế phát sinh chi tiêu',
     `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (`payer_id`) REFERENCES `members`(`id`) ON DELETE RESTRICT

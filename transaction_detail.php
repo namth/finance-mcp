@@ -134,7 +134,7 @@ require_once __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
     <!-- Thẻ Tổng Quan Hóa Đơn -->
-    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+    <div class="bg-white p-4 sm:p-6 rounded-2xl border border-slate-200 shadow-sm mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div>
             <p class="text-xs font-semibold text-slate-400 uppercase">Người Đứng Ra Trả Tiền</p>
             <p class="text-base sm:text-lg font-bold text-emerald-800 mt-1 flex items-center">
@@ -148,6 +148,20 @@ require_once __DIR__ . '/includes/header.php';
             <p class="text-xs font-semibold text-slate-400 uppercase">Tổng Số Tiền Hóa Đơn</p>
             <p class="text-xl sm:text-2xl font-black text-slate-900 mt-1"><?= number_format($tx['total_amount']) ?> <span class="text-sm font-normal text-slate-500">đ</span></p>
             <p class="text-xs text-slate-400 mt-0.5"><?= count($tx['items']) ?> món / sản phẩm</p>
+        </div>
+
+        <div>
+            <p class="text-xs font-semibold text-slate-400 uppercase">Ngày Chi Tiêu Thực Tế</p>
+            <?php 
+            $spentAtDisplay = !empty($tx['spent_at']) ? date('d/m/Y', strtotime($tx['spent_at'])) : date('d/m/Y', strtotime($tx['created_at']));
+            ?>
+            <p class="text-base sm:text-lg font-bold text-slate-900 mt-1 flex items-center">
+                <svg class="w-4 h-4 mr-1.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <?= $spentAtDisplay ?>
+            </p>
+            <p class="text-[11px] text-slate-400 mt-0.5">Tạo lúc: <?= date('d/m/Y H:i', strtotime($tx['created_at'])) ?></p>
         </div>
 
         <div>
@@ -172,7 +186,7 @@ require_once __DIR__ . '/includes/header.php';
                     </a>
                 <?php endif; ?>
             <?php else: ?>
-                <p class="text-sm font-medium text-slate-700 mt-1"><?= htmlspecialchars(substr($tx['created_at'], 0, 16)) ?></p>
+                <p class="text-xs text-slate-500 mt-1 font-medium">Không chỉ định quán</p>
             <?php endif; ?>
             <p class="text-xs text-slate-500 mt-0.5"><?= htmlspecialchars($tx['note'] ?: 'Không có ghi chú thêm') ?></p>
         </div>

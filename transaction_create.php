@@ -38,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $payerId = (int)($_POST['payer_id'] ?? 0);
         $placeId = !empty($_POST['place_id']) && (int)$_POST['place_id'] > 0 ? (int)$_POST['place_id'] : null;
         $status = (string)($_POST['status'] ?? 'completed');
+        $spentAt = !empty($_POST['spent_at']) ? trim((string)$_POST['spent_at']) : null;
         $note = trim((string)($_POST['note'] ?? ''));
         $rawItems = $_POST['items'] ?? [];
 
@@ -79,8 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new \InvalidArgumentException("Cần có ít nhất 1 món hợp lệ trong hóa đơn.");
         }
 
-        // Tạo giao dịch kèm place_id nếu có
-        $createdTx = $txModel->create($title, $payerId, $items, $status, $note ?: null, $currentGroupId, null, null, $placeId);
+        // Tạo giao dịch kèm place_id và spent_at nếu có
+        $createdTx = $txModel->create($title, $payerId, $items, $status, $note ?: null, $currentGroupId, null, null, $placeId, $spentAt);
 
         // Tự động tính nợ nếu completed
         if ($status === 'completed') {
@@ -142,17 +143,25 @@ require_once __DIR__ . '/includes/header.php';
 
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">
+                        Ngày Phát Sinh Chi Tiêu *
+                        <span class="text-[10px] lowercase font-normal text-slate-400">(ngày thực tế diễn ra)</span>
+                    </label>
+                    <input type="date" name="spent_at" required value="<?= htmlspecialchars($_POST['spent_at'] ?? date('Y-m-d')) ?>" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm font-semibold text-slate-800">
+                </div>
+
+                <div>
                     <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Trạng Thái</label>
                     <select name="status" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
                         <option value="completed" selected>Hoàn thành (Tự động tính nợ ngay)</option>
                         <option value="draft">Bản nháp (Chưa tính nợ)</option>
                     </select>
                 </div>
+            </div>
 
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
-                    <input type="text" name="note" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase mb-1">Ghi Chú</label>
+                <input type="text" name="note" placeholder="Dịp gặp mặt, chi tiết..." class="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 text-sm">
             </div>
         </div>
 

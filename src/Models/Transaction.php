@@ -11,10 +11,51 @@ class Transaction
 {
     private PDO $db;
 
+    private static bool $schemaChecked = false;
+
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::getConnection();
         (new Place($this->db))->ensureSchema();
+        $this->ensureSchema();
+    }
+
+    public function ensureSchema(): void
+    {
+        if (self::$schemaChecked) {
+            return;
+        }
+
+        try {
+            $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'sqlite') {
+                $stmt = $this->db->query("PRAGMA table_info(transactions)");
+                if ($stmt) {
+                    $cols = $stmt->fetchAll(PDO::FETCH_ASSOC);
+                    $hasSpentAt = false;
+                    foreach ($cols as $c) {
+                        if (($c['name'] ?? '') === 'spent_at') {
+                            $hasSpentAt = true;
+                            break;
+                        }
+                    }
+                    if (!$hasSpentAt) {
+                        $this->db->exec("ALTER TABLE transactions ADD COLUMN spent_at DATETIME DEFAULT NULL");
+                        $this->db->exec("UPDATE transactions SET spent_at = created_at WHERE spent_at IS NULL");
+                    }
+                }
+            } else {
+                $stmt = $this->db->query("SHOW COLUMNS FROM `transactions` LIKE 'spent_at'");
+                if (!$stmt->fetch()) {
+                    $this->db->exec("ALTER TABLE `transactions` ADD COLUMN `spent_at` DATETIME DEFAULT CURRENT_TIMESTAMP AFTER `status`");
+                    $this->db->exec("ALTER TABLE `transactions` ADD INDEX (`spent_at`)");
+                    $this->db->exec("UPDATE `transactions` SET `spent_at` = `created_at` WHERE `spent_at` IS NULL");
+                }
+            }
+            self::$schemaChecked = true;
+        } catch (\Throwable $e) {
+            // Bỏ qua lỗi nếu không có quyền DDL hoặc đã có
+        }
     }
 
     /**
@@ -29,6 +70,7 @@ class Transaction
      * @param string|null $placeName
      * @param string|null $placeAddress
      * @param int|null $placeId
+     * @param string|null $spentAt Ngày phát sinh chi tiêu thực tế (YYYY-MM-DD hoặc YYYY-MM-DD HH:mm:ss)
      * @return array Chi tiết giao dịch vừa tạo
      */
     public function create(
@@ -40,7 +82,8 @@ class Transaction
         int $groupId = 1,
         ?string $placeName = null,
         ?string $placeAddress = null,
-        ?int $placeId = null
+        ?int $placeId = null,
+        ?string $spentAt = null
     ): array {
         $title = trim($title);
         if (empty($title)) {
@@ -72,13 +115,29 @@ class Transaction
         }
         $placeId = ($placeId !== null && $placeId > 0) ? $placeId : null;
 
+        $spentAtTime = null;
+        if (!empty($spentAt)) {
+            $spentAt = trim($spentAt);
+            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $spentAt)) {
+                $spentAtTime = $spentAt . ' ' . date('H:i:s');
+            } else {
+                $timestamp = strtotime($spentAt);
+                if ($timestamp !== false) {
+                    $spentAtTime = date('Y-m-d H:i:s', $timestamp);
+                }
+            }
+        }
+        if (!$spentAtTime) {
+            $spentAtTime = date('Y-m-d H:i:s');
+        }
+
         $this->db->beginTransaction();
 
         try {
             // Tạo bản ghi transactions trước với total_amount = 0
             $stmt = $this->db->prepare("
-                INSERT INTO `transactions` (`group_id`, `place_id`, `title`, `payer_id`, `total_amount`, `status`, `note`)
-                VALUES (:group_id, :place_id, :title, :payer_id, 0.00, :status, :note)
+                INSERT INTO `transactions` (`group_id`, `place_id`, `title`, `payer_id`, `total_amount`, `status`, `note`, `spent_at`)
+                VALUES (:group_id, :place_id, :title, :payer_id, 0.00, :status, :note, :spent_at)
             ");
             $stmt->execute([
                 ':group_id' => $groupId,
@@ -87,6 +146,7 @@ class Transaction
                 ':payer_id' => $payerId,
                 ':status'   => $status,
                 ':note'     => $note ? trim($note) : null,
+                ':spent_at' => $spentAtTime,
             ]);
             $transactionId = (int)$this->db->lastInsertId();
 
@@ -270,7 +330,7 @@ class Transaction
             $sql .= " WHERE " . implode(' AND ', $conditions);
         }
 
-        $sql .= " ORDER BY t.id DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
+        $sql .= " ORDER BY COALESCE(t.spent_at, t.created_at) DESC, t.id DESC LIMIT " . (int)$limit . " OFFSET " . (int)$offset;
 
         $stmt = $this->db->prepare($sql);
         $stmt->execute($params);
@@ -388,6 +448,26 @@ class Transaction
             $note = $data['note'] !== null ? trim((string)$data['note']) : null;
             $fields[] = "`note` = :note";
             $params[':note'] = $note;
+        }
+
+        if (array_key_exists('spent_at', $data)) {
+            $spentAt = !empty($data['spent_at']) ? trim((string)$data['spent_at']) : null;
+            $spentAtTime = null;
+            if ($spentAt) {
+                if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $spentAt)) {
+                    $spentAtTime = $spentAt . ' ' . date('H:i:s');
+                } else {
+                    $timestamp = strtotime($spentAt);
+                    if ($timestamp !== false) {
+                        $spentAtTime = date('Y-m-d H:i:s', $timestamp);
+                    }
+                }
+            }
+            if (!$spentAtTime) {
+                $spentAtTime = date('Y-m-d H:i:s');
+            }
+            $fields[] = "`spent_at` = :spent_at";
+            $params[':spent_at'] = $spentAtTime;
         }
 
         $this->db->beginTransaction();

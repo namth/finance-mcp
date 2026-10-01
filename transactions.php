@@ -134,8 +134,8 @@ require_once __DIR__ . '/includes/header.php';
                         <div class="text-slate-500">
                             Người trả: <span class="font-bold text-emerald-700"><?= htmlspecialchars($t['payer_name']) ?></span>
                         </div>
-                        <div class="text-slate-400 text-[11px]">
-                            <?= htmlspecialchars(substr($t['created_at'], 0, 16)) ?>
+                        <div class="text-slate-400 text-[11px] text-right">
+                            <div>Ngày chi: <span class="font-bold text-slate-700"><?= date('d/m/Y', strtotime($t['spent_at'] ?? $t['created_at'])) ?></span></div>
                         </div>
                     </div>
 
@@ -212,8 +212,9 @@ require_once __DIR__ . '/includes/header.php';
                                     </span>
                                 <?php endif; ?>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-400 font-normal">
-                                <?= htmlspecialchars(substr($t['created_at'], 0, 16)) ?>
+                            <td class="px-6 py-4 whitespace-nowrap text-xs text-slate-500 font-normal">
+                                <div class="font-bold text-slate-800"><?= date('d/m/Y', strtotime($t['spent_at'] ?? $t['created_at'])) ?></div>
+                                <div class="text-[11px] text-slate-400">Tạo: <?= htmlspecialchars(substr($t['created_at'], 0, 16)) ?></div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-right space-x-2">
                                 <a href="transaction_detail.php?id=<?= $t['id'] ?>" class="px-2.5 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 rounded-lg transition border border-slate-200 hover:border-emerald-300">

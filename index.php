@@ -398,7 +398,7 @@ require_once __DIR__ . '/includes/header.php';
                         <div>
                             <div class="font-semibold text-slate-900 text-sm sm:text-base"><?= htmlspecialchars($tx['title']) ?></div>
                             <div class="text-[11px] sm:text-xs text-slate-500 mt-0.5">
-                                Người trả: <span class="font-semibold text-emerald-700"><?= htmlspecialchars($tx['payer_name']) ?></span> &bull; <?= htmlspecialchars(substr($tx['created_at'], 0, 16)) ?>
+                                Người trả: <span class="font-semibold text-emerald-700"><?= htmlspecialchars($tx['payer_name']) ?></span> &bull; Ngày chi: <span class="font-semibold text-slate-700"><?= date('d/m/Y', strtotime($tx['spent_at'] ?? $tx['created_at'])) ?></span>
                             </div>
                         </div>
                     </div>

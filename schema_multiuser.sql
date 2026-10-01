@@ -230,4 +230,26 @@ PREPARE alterIfNotExists FROM @preparedStatement;
 EXECUTE alterIfNotExists;
 DEALLOCATE PREPARE alterIfNotExists;
 
+-- 4. Bổ sung cột spent_at (ngày phát sinh chi tiêu thực tế) vào transactions nếu chưa có
+SET @tablename = "transactions";
+SET @columnname = "spent_at";
+SET @preparedStatement = (SELECT IF(
+  (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE
+      (table_name = @tablename)
+      AND (table_schema = @dbname)
+      AND (column_name = @columnname)
+  ) > 0,
+  "SELECT 1",
+  "ALTER TABLE `transactions` ADD COLUMN `spent_at` DATETIME DEFAULT CURRENT_TIMESTAMP AFTER `status`, ADD INDEX (`spent_at`);"
+));
+PREPARE alterIfNotExists FROM @preparedStatement;
+EXECUTE alterIfNotExists;
+DEALLOCATE PREPARE alterIfNotExists;
+
+-- Cập nhật dữ liệu cũ nếu spent_at bị null
+UPDATE `transactions` SET `spent_at` = `created_at` WHERE `spent_at` IS NULL;
+
+
 

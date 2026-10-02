@@ -178,4 +178,46 @@ assert(strpos($mcpTxUpdated['spent_at'], $newMcpSpentDate) === 0, "MCP updated t
 assert(strpos($updateJson['summary_text'], '20/09/2026') !== false, "summary_text must display updated spent_at");
 echo "✓ MCP transaction_update cập nhật spent_at thành công!\n";
 
+// 8. MCP transaction_date_update với tham số 'date'
+$dateViaTool = '2026-09-18';
+$mcpDateUpdateRes = $server->handleRequest([
+    'jsonrpc' => '2.0',
+    'id' => 12,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'transaction_date_update',
+        'arguments' => [
+            'id' => $mcpTxId,
+            'date' => $dateViaTool
+        ]
+    ]
+]);
+assert(empty($mcpDateUpdateRes['result']['isError']), "transaction_date_update must succeed");
+$dateUpdateJson = json_decode($mcpDateUpdateRes['result']['content'][0]['text'], true);
+$mcpTxDateUpdated = $txModel->find($mcpTxId);
+assert(strpos($mcpTxDateUpdated['spent_at'], $dateViaTool) === 0, "spent_at must match $dateViaTool");
+assert(strpos($dateUpdateJson['summary_text'], '18/09/2026') !== false, "summary_text must display 18/09/2026");
+echo "✓ MCP transaction_date_update cập nhật ngày thành công!\n";
+
+// 9. MCP alias update_transaction_date
+$dateViaAlias = '2026-09-15';
+$mcpAliasRes = $server->handleRequest([
+    'jsonrpc' => '2.0',
+    'id' => 13,
+    'method' => 'tools/call',
+    'params' => [
+        'name' => 'update_transaction_date',
+        'arguments' => [
+            'transaction_id' => $mcpTxId,
+            'spent_at' => $dateViaAlias
+        ]
+    ]
+]);
+assert(empty($mcpAliasRes['result']['isError']), "update_transaction_date must succeed");
+$aliasJson = json_decode($mcpAliasRes['result']['content'][0]['text'], true);
+$mcpTxAliasUpdated = $txModel->find($mcpTxId);
+assert(strpos($mcpTxAliasUpdated['spent_at'], $dateViaAlias) === 0, "spent_at must match $dateViaAlias");
+assert(strpos($aliasJson['summary_text'], '15/09/2026') !== false, "summary_text must display 15/09/2026");
+echo "✓ MCP alias update_transaction_date cập nhật ngày thành công!\n";
+
 echo "\n>>> TẤT CẢ TEST SPENT_AT ĐÃ PASS HOÀN HẢO! <<<\n";

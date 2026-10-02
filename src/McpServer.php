@@ -419,6 +419,17 @@ class McpServer
                         }
                     }
 
+                    // Chuẩn hóa spent_at nếu caller truyền date, spent_date, transaction_date
+                    if (!isset($args['spent_at'])) {
+                        if (isset($args['date'])) {
+                            $args['spent_at'] = $args['date'];
+                        } elseif (isset($args['spent_date'])) {
+                            $args['spent_at'] = $args['spent_date'];
+                        } elseif (isset($args['transaction_date'])) {
+                            $args['spent_at'] = $args['transaction_date'];
+                        }
+                    }
+
                     $updatedTx = $txModel->update($id, $args, $groupId);
                     if (!$updatedTx) {
                         throw new \InvalidArgumentException("Không thể cập nhật giao dịch #{$id}.");
@@ -507,6 +518,76 @@ class McpServer
                         'transaction'        => $updatedTx,
                         'group_id'           => $groupId,
                         'debts_recalculated' => $debtsRecalculated,
+                    ];
+                })(),
+
+                'transaction_date_update' => (function () use ($txModel, $args) {
+                    $id = (int)($args['id'] ?? $args['transaction_id'] ?? 0);
+                    if ($id <= 0) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp ID giao dịch (id hoặc transaction_id).");
+                    }
+                    $groupId = $this->getEffectiveGroupId($args);
+
+                    $oldTx = $txModel->find($id);
+                    if (!$oldTx) {
+                        throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$id}");
+                    }
+                    if ((int)$oldTx['group_id'] !== $groupId) {
+                        throw new \InvalidArgumentException("Giao dịch #{$id} không thuộc nhóm chi tiêu của bạn.");
+                    }
+
+                    $spentAt = (string)($args['spent_at'] ?? $args['date'] ?? $args['transaction_date'] ?? $args['spent_date'] ?? '');
+                    if (empty($spentAt)) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp ngày phát sinh chi tiêu (spent_at hoặc date, ví dụ: '2026-09-28').");
+                    }
+
+                    $updatedTx = $txModel->update($id, ['spent_at' => $spentAt], $groupId);
+                    $splitSummary = $this->buildTransactionSplitSummary($updatedTx);
+                    $formattedDate = date('d/m/Y', strtotime($updatedTx['spent_at']));
+
+                    return [
+                        'success'       => true,
+                        'message'       => "Đã cập nhật ngày phát sinh chi tiêu của giao dịch #{$id} thành ngày {$formattedDate}.",
+                        'spent_at'      => $updatedTx['spent_at'],
+                        'summary_text'  => $splitSummary['summary_text'],
+                        'split_summary' => $splitSummary,
+                        'transaction'   => $updatedTx,
+                        'group_id'      => $groupId,
+                    ];
+                })(),
+
+                'update_transaction_date' => (function () use ($txModel, $args) {
+                    $id = (int)($args['id'] ?? $args['transaction_id'] ?? 0);
+                    if ($id <= 0) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp ID giao dịch (id hoặc transaction_id).");
+                    }
+                    $groupId = $this->getEffectiveGroupId($args);
+
+                    $oldTx = $txModel->find($id);
+                    if (!$oldTx) {
+                        throw new \InvalidArgumentException("Không tìm thấy giao dịch với ID: {$id}");
+                    }
+                    if ((int)$oldTx['group_id'] !== $groupId) {
+                        throw new \InvalidArgumentException("Giao dịch #{$id} không thuộc nhóm chi tiêu của bạn.");
+                    }
+
+                    $spentAt = (string)($args['spent_at'] ?? $args['date'] ?? $args['transaction_date'] ?? $args['spent_date'] ?? '');
+                    if (empty($spentAt)) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp ngày phát sinh chi tiêu (spent_at hoặc date, ví dụ: '2026-09-28').");
+                    }
+
+                    $updatedTx = $txModel->update($id, ['spent_at' => $spentAt], $groupId);
+                    $splitSummary = $this->buildTransactionSplitSummary($updatedTx);
+                    $formattedDate = date('d/m/Y', strtotime($updatedTx['spent_at']));
+
+                    return [
+                        'success'       => true,
+                        'message'       => "Đã cập nhật ngày phát sinh chi tiêu của giao dịch #{$id} thành ngày {$formattedDate}.",
+                        'spent_at'      => $updatedTx['spent_at'],
+                        'summary_text'  => $splitSummary['summary_text'],
+                        'split_summary' => $splitSummary,
+                        'transaction'   => $updatedTx,
+                        'group_id'      => $groupId,
                     ];
                 })(),
 
@@ -1029,6 +1110,36 @@ class McpServer
                         'group_id'       => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
                     ],
                     'required' => ['transaction_id', 'price'],
+                ],
+            ],
+            'transaction_date_update' => [
+                'name' => 'transaction_date_update',
+                'description' => 'Cập nhật ngày/thời gian phát sinh chi tiêu thực tế (spent_at / date) của một giao dịch cụ thể (ví dụ: đổi ngày đi ăn từ hôm nay về ngày 2026-09-28). Giữ nguyên toàn bộ danh sách món ăn, giá tiền, người tham gia và công nợ của nhóm.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id'             => ['type' => 'integer', 'description' => 'ID của giao dịch cần đổi ngày'],
+                        'transaction_id' => ['type' => 'integer', 'description' => 'Bí danh (alias) của id'],
+                        'spent_at'       => ['type' => 'string', 'description' => 'Ngày/thời gian phát sinh chi tiêu mới (định dạng YYYY-MM-DD hoặc YYYY-MM-DD HH:mm:ss, ví dụ: "2026-09-28")'],
+                        'date'           => ['type' => 'string', 'description' => 'Bí danh (alias) của spent_at (ví dụ: "2026-09-28")'],
+                        'group_id'       => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                    ],
+                    'required' => [],
+                ],
+            ],
+            'update_transaction_date' => [
+                'name' => 'update_transaction_date',
+                'description' => 'Bí danh của transaction_date_update. Cập nhật ngày/thời gian phát sinh chi tiêu thực tế (spent_at / date) của một giao dịch.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'id'             => ['type' => 'integer', 'description' => 'ID của giao dịch cần đổi ngày'],
+                        'transaction_id' => ['type' => 'integer', 'description' => 'Bí danh của id'],
+                        'spent_at'       => ['type' => 'string', 'description' => 'Ngày/thời gian phát sinh chi tiêu mới (ví dụ: "2026-09-28")'],
+                        'date'           => ['type' => 'string', 'description' => 'Bí danh của spent_at (ví dụ: "2026-09-28")'],
+                        'group_id'       => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                    ],
+                    'required' => [],
                 ],
             ],
             'transaction_delete' => [

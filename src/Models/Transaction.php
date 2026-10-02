@@ -450,8 +450,19 @@ class Transaction
             $params[':note'] = $note;
         }
 
+        $spentAtRaw = null;
         if (array_key_exists('spent_at', $data)) {
-            $spentAt = !empty($data['spent_at']) ? trim((string)$data['spent_at']) : null;
+            $spentAtRaw = $data['spent_at'];
+        } elseif (array_key_exists('date', $data)) {
+            $spentAtRaw = $data['date'];
+        } elseif (array_key_exists('spent_date', $data)) {
+            $spentAtRaw = $data['spent_date'];
+        } elseif (array_key_exists('transaction_date', $data)) {
+            $spentAtRaw = $data['transaction_date'];
+        }
+
+        if ($spentAtRaw !== null || array_key_exists('spent_at', $data) || array_key_exists('date', $data)) {
+            $spentAt = !empty($spentAtRaw) ? trim((string)$spentAtRaw) : null;
             $spentAtTime = null;
             if ($spentAt) {
                 if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $spentAt)) {

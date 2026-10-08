@@ -8,6 +8,7 @@ use SimpleFinance\Models\Transaction;
 use SimpleFinance\Models\Settlement;
 use SimpleFinance\Models\Group;
 use SimpleFinance\Models\User;
+use SimpleFinance\Models\GroupBuy;
 use Throwable;
 
 class McpServer
@@ -807,6 +808,77 @@ class McpServer
                     ];
                 })(),
 
+                // ==================== GROUP BUY EVENTS ====================
+                'group_buy_list' => (function () use ($args) {
+                    $groupId = $this->getEffectiveGroupId($args);
+                    $gb = new GroupBuy();
+                    return $gb->getEventsByGroup($groupId);
+                })(),
+
+                'group_buy_create' => (function () use ($args) {
+                    if (!$this->currentUser) {
+                        throw new \InvalidArgumentException("Cần đăng nhập tài khoản để tạo sự kiện mua chung.");
+                    }
+                    $groupId = $this->getEffectiveGroupId($args);
+                    $title = trim((string)($args['title'] ?? ''));
+                    $desc = isset($args['description']) ? (string)$args['description'] : null;
+                    $imageUrl = isset($args['image_url']) ? (string)$args['image_url'] : null;
+                    $deadline = isset($args['deadline']) ? (string)$args['deadline'] : null;
+                    $items = isset($args['items']) && is_array($args['items']) ? $args['items'] : [];
+
+                    $gb = new GroupBuy();
+                    $created = $gb->createEvent($groupId, (int)$this->currentUser['id'], $title, $desc, $imageUrl, $deadline, $items);
+                    return [
+                        'success'      => true,
+                        'message'      => "Đã tạo sự kiện mua chung '{$title}' thành công!",
+                        'event'        => $created,
+                        'public_token' => $created['public_token'],
+                    ];
+                })(),
+
+                'group_buy_get' => (function () use ($args) {
+                    $gb = new GroupBuy();
+                    $event = null;
+                    if (!empty($args['token']) || !empty($args['public_token'])) {
+                        $token = (string)($args['token'] ?? $args['public_token']);
+                        $event = $gb->getEventByToken($token);
+                    } elseif (!empty($args['id']) || !empty($args['event_id'])) {
+                        $id = (int)($args['id'] ?? $args['event_id']);
+                        $event = $gb->getEventById($id);
+                    } else {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp token hoặc id sự kiện mua chung.");
+                    }
+
+                    if (!$event) {
+                        throw new \InvalidArgumentException("Không tìm thấy sự kiện mua chung.");
+                    }
+
+                    $event['registrations'] = $gb->getRegistrations((int)$event['id']);
+                    $event['breakdown'] = $gb->getSummaryBreakdown((int)$event['id']);
+                    return $event;
+                })(),
+
+                'group_buy_register' => (function () use ($args) {
+                    $token = trim((string)($args['token'] ?? $args['public_token'] ?? ''));
+                    $name = trim((string)($args['participant_name'] ?? $args['name'] ?? ''));
+                    $phone = isset($args['participant_phone']) || isset($args['phone']) ? (string)($args['participant_phone'] ?? $args['phone']) : null;
+                    $note = isset($args['note']) ? (string)$args['note'] : null;
+                    $items = isset($args['items']) && is_array($args['items']) ? $args['items'] : [];
+
+                    if (empty($token)) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp token của sự kiện mua chung.");
+                    }
+                    if (empty($name)) {
+                        throw new \InvalidArgumentException("Vui lòng nhập họ và tên người tham gia.");
+                    }
+                    if (empty($items)) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp danh sách món hoặc size cần đặt (items: [{item_id: int, quantity: int}]).");
+                    }
+
+                    $gb = new GroupBuy();
+                    return $gb->register($token, $name, $phone, $note, $items);
+                })(),
+
                 default => throw new \InvalidArgumentException("Không hỗ trợ tool: {$name}")
             };
 
@@ -1257,6 +1329,83 @@ class McpServer
                         'bank_account_name' => ['type' => 'string',  'description' => 'Tên chủ tài khoản người nhận nếu muốn chỉ định'],
                         'group_id'          => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
                     ],
+                ],
+            ],
+
+            // Group Buy Events (FEAT-001)
+            'group_buy_list' => [
+                'name' => 'group_buy_list',
+                'description' => 'Lấy danh sách các sự kiện mua chung trong một nhóm chi tiêu.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'group_id' => ['type' => 'integer', 'description' => 'ID nhóm (tùy chọn, mặc định lấy nhóm hiện tại)'],
+                    ],
+                ],
+            ],
+            'group_buy_create' => [
+                'name' => 'group_buy_create',
+                'description' => 'Tạo sự kiện mua chung mới (gom đơn áo, cơm trưa, mua quà...) kèm danh sách món/size và bảng giá.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'title'       => ['type' => 'string', 'description' => 'Tên sự kiện mua chung (ví dụ: Áo Thun Đồng Phục 2026)'],
+                        'description' => ['type' => 'string', 'description' => 'Mô tả chi tiết hoặc ghi chú (tùy chọn)'],
+                        'image_url'   => ['type' => 'string', 'description' => 'Đường dẫn ảnh sản phẩm / mẫu áo / bảng kích thước (tùy chọn)'],
+                        'deadline'    => ['type' => 'string', 'description' => 'Hạn chót đăng ký theo định dạng YYYY-MM-DD HH:MM:SS (tùy chọn)'],
+                        'items'       => [
+                            'type'        => 'array',
+                            'description' => 'Danh sách phân loại/món: mảng các object [{name: string, option_name: string, price: number}]',
+                            'items'       => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'name'        => ['type' => 'string'],
+                                    'option_name' => ['type' => 'string'],
+                                    'price'       => ['type' => 'number'],
+                                ],
+                                'required' => ['option_name', 'price'],
+                            ],
+                        ],
+                        'group_id' => ['type' => 'integer', 'description' => 'ID nhóm chi tiêu (tùy chọn)'],
+                    ],
+                    'required' => ['title', 'items'],
+                ],
+            ],
+            'group_buy_get' => [
+                'name' => 'group_buy_get',
+                'description' => 'Xem chi tiết một sự kiện mua chung bằng public token hoặc id (kèm danh sách món, danh sách đăng ký và thống kê số lượng từng size).',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'token'    => ['type' => 'string',  'description' => 'Token công khai của sự kiện (ưu tiên)'],
+                        'event_id' => ['type' => 'integer', 'description' => 'ID sự kiện mua chung (nếu không có token)'],
+                    ],
+                ],
+            ],
+            'group_buy_register' => [
+                'name' => 'group_buy_register',
+                'description' => 'Đăng ký tham gia vào sự kiện mua chung (chọn các món, số lượng, điền tên) và nhận thông tin số tiền + mã VietQR chuyển khoản thanh toán tức thì.',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'token'             => ['type' => 'string', 'description' => 'Token công khai của sự kiện mua chung'],
+                        'participant_name'  => ['type' => 'string', 'description' => 'Họ và tên người đăng ký'],
+                        'participant_phone' => ['type' => 'string', 'description' => 'Số điện thoại hoặc Nickname Zalo (tùy chọn)'],
+                        'note'              => ['type' => 'string', 'description' => 'Ghi chú đơn hàng (tùy chọn)'],
+                        'items'             => [
+                            'type'        => 'array',
+                            'description' => 'Danh sách món/size đã chọn: mảng [{item_id: integer, quantity: integer}]',
+                            'items'       => [
+                                'type'       => 'object',
+                                'properties' => [
+                                    'item_id'  => ['type' => 'integer', 'description' => 'ID món/size trong sự kiện'],
+                                    'quantity' => ['type' => 'integer', 'description' => 'Số lượng đặt'],
+                                ],
+                                'required' => ['item_id', 'quantity'],
+                            ],
+                        ],
+                    ],
+                    'required' => ['token', 'participant_name', 'items'],
                 ],
             ],
         ];

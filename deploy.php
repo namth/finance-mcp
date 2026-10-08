@@ -341,6 +341,13 @@ if ($runMigration) {
         } else {
             $migrationResult = 'Không tìm thấy file schema_multiuser.sql';
         }
+
+        $gbSqlFile = __DIR__ . '/schema_groupbuy.sql';
+        if (file_exists($gbSqlFile)) {
+            $gbContent = file_get_contents($gbSqlFile);
+            $pdo->exec($gbContent);
+            $migrationResult .= ' & schema_groupbuy.sql thành công!';
+        }
     } catch (\Throwable $e) {
         $migrationResult = 'Lỗi migration CSDL: ' . $e->getMessage();
     }

@@ -111,6 +111,9 @@ $currentGroupId = (int)($_SESSION['current_group_id'] ?? 0);
                         <a href="settlements.php" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition <?= $currentPage === 'settlements.php' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50' ?>">
                             Gạch Nợ
                         </a>
+                        <a href="group_buys.php" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition <?= in_array($currentPage, ['group_buys.php', 'group_buy_detail.php']) ? 'bg-slate-100 text-slate-900 font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50' ?>">
+                            Mua Chung
+                        </a>
                         <a href="groups.php" class="px-3 py-1.5 rounded-lg text-xs font-semibold transition <?= $currentPage === 'groups.php' ? 'bg-slate-100 text-slate-900' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50' ?>">
                             Nhóm
                         </a>

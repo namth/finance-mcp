@@ -164,6 +164,29 @@ require_once __DIR__ . '/includes/header.php';
     </div>
 </div>
 
+<!-- Lối Tắt Sự Kiện Mua Chung Mới (FEAT-001) -->
+<div class="mb-6 sm:mb-8 bg-gradient-to-r from-emerald-600 via-teal-600 to-indigo-700 rounded-2xl p-4 sm:p-6 text-white shadow-md shadow-emerald-900/10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex items-center space-x-3 sm:space-x-4">
+        <div class="w-12 h-12 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center text-white flex-shrink-0 text-xl font-bold">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            </svg>
+        </div>
+        <div>
+            <div class="flex items-center space-x-2">
+                <span class="px-2 py-0.5 rounded-full bg-white/20 text-[10px] font-black uppercase tracking-wider">Mới</span>
+                <h3 class="text-base sm:text-lg font-black tracking-tight">Sự Kiện Mua Chung & Gom Đơn</h3>
+            </div>
+            <p class="text-xs sm:text-sm text-emerald-100 mt-0.5">Tạo trang mua chung cho nhóm, chia sẻ link công khai cho mọi người chọn size, VietQR tự động & chốt hóa đơn.</p>
+        </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a href="group_buys.php" class="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-white text-emerald-800 text-xs sm:text-sm font-black shadow-sm hover:bg-emerald-50 active:scale-95 transition">
+            + Tạo Sự Kiện Mua Chung
+        </a>
+    </div>
+</div>
+
 <!-- Khối Bảng Tổng Kết Công Nợ Tự Động -->
 <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-6 sm:mb-8">
     <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 bg-slate-50/50">

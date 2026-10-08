@@ -94,6 +94,16 @@
                     <span class="text-[10px] text-slate-400 mt-0.5">Các đợt trả tiền</span>
                 </a>
 
+                <a href="group_buys.php" class="flex flex-col items-center p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50 hover:border-emerald-200 transition">
+                    <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold text-slate-800">Mua Chung</span>
+                    <span class="text-[10px] text-slate-400 mt-0.5">Sự kiện & gom đơn</span>
+                </a>
+
                 <a href="groups.php" class="flex flex-col items-center p-3.5 rounded-2xl border border-slate-200 bg-slate-50/50 hover:bg-emerald-50 hover:border-emerald-200 transition">
                     <div class="w-10 h-10 rounded-xl bg-purple-100 text-purple-700 flex items-center justify-center mb-2">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

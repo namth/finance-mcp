@@ -348,6 +348,13 @@ if ($runMigration) {
             $pdo->exec($gbContent);
             $migrationResult .= ' & schema_groupbuy.sql thành công!';
         }
+
+        $patchFile = __DIR__ . '/patch_event_image.sql';
+        if (file_exists($patchFile)) {
+            $patchContent = file_get_contents($patchFile);
+            $pdo->exec($patchContent);
+            $migrationResult .= ' & patch_event_image.sql thành công!';
+        }
     } catch (\Throwable $e) {
         $migrationResult = 'Lỗi migration CSDL: ' . $e->getMessage();
     }

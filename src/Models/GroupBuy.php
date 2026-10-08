@@ -730,6 +730,45 @@ class GroupBuy
     }
 
     /**
+     * Cập nhật thông tin sự kiện mua chung (tiêu đề, mô tả, ảnh, hạn chót)
+     */
+    public function updateEvent(int $eventId, array $data): bool
+    {
+        $event = $this->getEventById($eventId);
+        if (!$event) {
+            throw new InvalidArgumentException("Không tìm thấy sự kiện #{$eventId}.");
+        }
+
+        $fields = [];
+        $params = [':id' => $eventId];
+
+        if (array_key_exists('title', $data)) {
+            $fields[] = "`title` = :title";
+            $params[':title'] = $data['title'];
+        }
+        if (array_key_exists('description', $data)) {
+            $fields[] = "`description` = :description";
+            $params[':description'] = $data['description'];
+        }
+        if (array_key_exists('image_url', $data)) {
+            $fields[] = "`image_url` = :image_url";
+            $params[':image_url'] = $data['image_url'];
+        }
+        if (array_key_exists('deadline', $data)) {
+            $fields[] = "`deadline` = :deadline";
+            $params[':deadline'] = $data['deadline'];
+        }
+
+        if (empty($fields)) {
+            return false;
+        }
+
+        $sql = "UPDATE `group_buy_events` SET " . implode(', ', $fields) . " WHERE `id` = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($params);
+    }
+
+    /**
      * Xóa 1 đơn đăng ký (trong trường hợp người dùng đăng ký nhầm)
      */
     public function deleteRegistration(int $registrationId): bool

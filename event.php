@@ -144,6 +144,48 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                             </div>
                         <?php endif; ?>
                     </div>
+
+                    <!-- Bộ Sưu Tập Ảnh Sản Phẩm & Bảng Size Chi Tiết -->
+                    <?php
+                        $shirtImage = 'uploads/mau_ao_dong_phuc_bach_khoa.jpg';
+                        $sizeChartImage = 'uploads/bang_size_ao_cotton.jpg';
+                    ?>
+                    <div class="space-y-2 pt-2 border-t border-slate-100">
+                        <div class="flex items-center justify-between text-xs">
+                            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+                                <i class="fa-regular fa-images text-emerald-600"></i>
+                                Hình ảnh mẫu áo & Bảng kích thước:
+                            </span>
+                            <span class="text-[11px] text-slate-400">Bấm ảnh để phóng to</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <!-- Ảnh Mẫu Áo Thực Tế -->
+                            <div onclick="openLightbox('<?= htmlspecialchars($shirtImage) ?>', 'Mẫu Áo Đồng Phục CĐ Tin 3,4 Bách Khoa')" class="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer aspect-3/4 sm:aspect-4/3 shadow-2xs hover:shadow-md transition">
+                                <img src="<?= htmlspecialchars($shirtImage) ?>" alt="Mẫu Áo Thực Tế" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5 sm:p-3">
+                                    <span class="text-white text-[11px] sm:text-xs font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-shirt"></i> Mẫu áo thực tế
+                                    </span>
+                                </div>
+                                <div class="absolute top-2 right-2 w-7 h-7 bg-black/40 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition backdrop-blur-xs">
+                                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                </div>
+                            </div>
+
+                            <!-- Ảnh Bảng Size Chi Tiết -->
+                            <div onclick="openLightbox('<?= htmlspecialchars($sizeChartImage) ?>', 'Bảng Thông Số Size Áo Cotton 250GSM')" class="group relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-100 cursor-pointer aspect-3/4 sm:aspect-4/3 shadow-2xs hover:shadow-md transition">
+                                <img src="<?= htmlspecialchars($sizeChartImage) ?>" alt="Bảng Size Áo" class="w-full h-full object-cover group-hover:scale-105 transition duration-300">
+                                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex items-end p-2.5 sm:p-3">
+                                    <span class="text-white text-[11px] sm:text-xs font-bold flex items-center gap-1">
+                                        <i class="fa-solid fa-ruler-combined"></i> Bảng thông số size
+                                    </span>
+                                </div>
+                                <div class="absolute top-2 right-2 w-7 h-7 bg-black/40 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition backdrop-blur-xs">
+                                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -177,12 +219,17 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
 
                 <!-- 2. Danh mục món / Size -->
                 <div class="space-y-4">
-                    <div class="flex items-center justify-between">
+                    <div class="flex items-center justify-between flex-wrap gap-2">
                         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">2</span>
                             Chọn kích cỡ & số lượng
                         </h3>
-                        <span class="text-[11px] text-slate-400">Chọn ít nhất 1 áo</span>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openLightbox('<?= htmlspecialchars($sizeChartImage) ?>', 'Bảng Thông Số Size')" class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-xl border border-emerald-200 transition">
+                                <i class="fa-solid fa-ruler-combined"></i> Bảng Size
+                            </button>
+                            <span class="text-[11px] text-slate-400">Chọn ít nhất 1 áo</span>
+                        </div>
                     </div>
 
                     <?php
@@ -472,6 +519,26 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
         </div>
     </div>
 
+    <!-- POPUP / MODAL LIGHTBOX XEM ẢNH PHÓNG TO -->
+    <div id="modal-lightbox" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-3 sm:p-6" onclick="closeLightbox()">
+        <div class="relative max-w-2xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
+            <button type="button" onclick="closeLightbox()" class="absolute -top-10 right-0 text-white/90 hover:text-white p-2 text-2xl transition">
+                <i class="fa-solid fa-xmark"></i>
+            </button>
+            <div class="bg-white rounded-3xl overflow-hidden shadow-2xl p-3 w-full space-y-2">
+                <div class="text-xs sm:text-sm font-bold text-slate-800 px-2 py-1 text-center truncate" id="lightbox-title">
+                    Hình ảnh chi tiết
+                </div>
+                <div class="max-h-[75vh] overflow-auto rounded-2xl flex items-center justify-center bg-slate-950/5 p-1 border border-slate-100">
+                    <img id="lightbox-img" src="" alt="Xem ảnh phóng to" class="max-h-[72vh] w-auto max-w-full object-contain rounded-xl shadow-xs">
+                </div>
+                <div class="text-center text-[11px] text-slate-400 py-1">
+                    Bấm ra ngoài hoặc nút ✕ để đóng
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notification -->
     <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 text-white text-xs px-4 py-3 rounded-2xl shadow-xl hidden transition-all duration-300 flex items-center gap-2 z-50">
         <i class="fa-solid fa-circle-check text-emerald-400"></i>
@@ -479,6 +546,18 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
     </div>
 
     <script>
+        function openLightbox(url, title) {
+            const img = document.getElementById('lightbox-img');
+            const titleEl = document.getElementById('lightbox-title');
+            img.src = url;
+            titleEl.innerText = title || 'Xem ảnh lớn';
+            document.getElementById('modal-lightbox').classList.remove('hidden');
+        }
+
+        function closeLightbox() {
+            document.getElementById('modal-lightbox').classList.add('hidden');
+        }
+
         function formatVND(amount) {
             return new Intl.NumberFormat('vi-VN').format(amount) + ' ₫';
         }

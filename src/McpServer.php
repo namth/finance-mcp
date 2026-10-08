@@ -858,6 +858,26 @@ class McpServer
                     return $event;
                 })(),
 
+                'group_buy_update' => (function () use ($args) {
+                    $gb = new GroupBuy();
+                    $id = (int)($args['id'] ?? $args['event_id'] ?? 0);
+                    if ($id <= 0) {
+                        throw new \InvalidArgumentException("Vui lòng cung cấp event_id cần cập nhật.");
+                    }
+                    $data = [];
+                    if (isset($args['title'])) $data['title'] = trim((string)$args['title']);
+                    if (isset($args['description'])) $data['description'] = trim((string)$args['description']);
+                    if (isset($args['image_url'])) $data['image_url'] = trim((string)$args['image_url']);
+                    if (isset($args['deadline'])) $data['deadline'] = trim((string)$args['deadline']);
+
+                    $gb->updateEvent($id, $data);
+                    return [
+                        'success' => true,
+                        'message' => "Đã cập nhật sự kiện #{$id} thành công!",
+                        'event'   => $gb->getEventById($id),
+                    ];
+                })(),
+
                 'group_buy_register' => (function () use ($args) {
                     $token = trim((string)($args['token'] ?? $args['public_token'] ?? ''));
                     $name = trim((string)($args['participant_name'] ?? $args['name'] ?? ''));
@@ -1380,6 +1400,21 @@ class McpServer
                         'token'    => ['type' => 'string',  'description' => 'Token công khai của sự kiện (ưu tiên)'],
                         'event_id' => ['type' => 'integer', 'description' => 'ID sự kiện mua chung (nếu không có token)'],
                     ],
+                ],
+            ],
+            'group_buy_update' => [
+                'name' => 'group_buy_update',
+                'description' => 'Cập nhật thông tin sự kiện mua chung (tiêu đề, mô tả, ảnh bìa sản phẩm, thời gian hết hạn).',
+                'inputSchema' => [
+                    'type' => 'object',
+                    'properties' => [
+                        'event_id'    => ['type' => 'integer', 'description' => 'ID của sự kiện mua chung cần sửa'],
+                        'title'       => ['type' => 'string',  'description' => 'Tiêu đề sự kiện mới (tùy chọn)'],
+                        'description' => ['type' => 'string',  'description' => 'Mô tả chi tiết mới (tùy chọn)'],
+                        'image_url'   => ['type' => 'string',  'description' => 'URL ảnh sản phẩm mới (tùy chọn)'],
+                        'deadline'    => ['type' => 'string',  'description' => 'Hạn chót mới (YYYY-MM-DD HH:MM:SS) (tùy chọn)'],
+                    ],
+                    'required' => ['event_id'],
                 ],
             ],
             'group_buy_register' => [

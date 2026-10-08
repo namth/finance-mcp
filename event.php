@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 spl_autoload_register(function ($class) {
     $prefix = 'SimpleFinance\\';
     $baseDir = __DIR__ . '/src/';
@@ -25,6 +27,9 @@ if (!empty($token)) {
 } else {
     $error = "Thiếu mã xác thực sự kiện (token). Vui lòng kiểm tra lại đường dẫn!";
 }
+
+$isExpired = ($event && !empty($event['deadline'])) ? (strtotime($event['deadline']) <= time()) : false;
+$isClosed = ($event && ($event['status'] !== 'open' || $isExpired));
 
 $registrations = ($event && !empty($event['id'])) ? $groupBuyModel->getRegistrations((int)$event['id']) : [];
 $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "Sự Kiện Mua Chung - SimpleFinance";
@@ -62,11 +67,21 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                 </div>
                 <span class="font-bold text-slate-800 text-sm tracking-tight">SimpleFinance • Gom Mua Chung</span>
             </div>
-            <?php if ($event && $event['status'] === 'open'): ?>
-                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Đang nhận đơn
-                </span>
+            <?php if ($event): ?>
+                <?php if ($event['status'] === 'converted'): ?>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        <i class="fa-solid fa-receipt text-[11px]"></i> Đã chốt hóa đơn
+                    </span>
+                <?php elseif ($isClosed): ?>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-700 border border-slate-300">
+                        <i class="fa-solid fa-lock text-[11px]"></i> Đã đóng đơn <?= !empty($event['deadline']) ? '(' . date('H:i d/m', strtotime($event['deadline'])) . ')' : '' ?>
+                    </span>
+                <?php else: ?>
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        Đang nhận đơn
+                    </span>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -78,17 +93,6 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                 </div>
                 <h3 class="text-base font-bold text-slate-900">Không tìm thấy sự kiện</h3>
                 <p class="text-xs text-red-600 mt-1 max-w-sm mx-auto"><?= htmlspecialchars($error) ?></p>
-            </div>
-        <?php elseif ($event['status'] !== 'open'): ?>
-            <!-- Closed / Converted Card -->
-            <div class="bg-white rounded-3xl border border-amber-200 p-8 text-center shadow-sm">
-                <div class="w-14 h-14 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">
-                    <i class="fa-solid fa-lock"></i>
-                </div>
-                <h3 class="text-base font-bold text-slate-900">Sự kiện đã kết thúc nhận đăng ký</h3>
-                <p class="text-xs text-slate-500 mt-1 max-w-md mx-auto">
-                    Admin đã khóa đơn sự kiện <strong>"<?= htmlspecialchars($event['title']) ?>"</strong> để tiến hành chốt danh sách và đặt hàng.
-                </p>
             </div>
         <?php else: ?>
 
@@ -189,9 +193,22 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                 </div>
             </div>
 
-            <!-- Form Đăng Ký (Các ô input nền trắng 100%) -->
-            <form id="public-order-form" onsubmit="submitGroupBuyOrder(event)" class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-6">
-                <input type="hidden" id="event-token" value="<?= htmlspecialchars($event['public_token']) ?>">
+            <?php if ($isClosed): ?>
+                <!-- Thông Báo Đã Hết Hạn / Khóa Đơn -->
+                <div class="bg-amber-50 border border-amber-200 rounded-3xl p-6 text-center space-y-2 shadow-2xs">
+                    <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto text-xl">
+                        <i class="fa-solid fa-lock"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-slate-900">Sự kiện đã kết thúc nhận đăng ký</h3>
+                    <p class="text-xs text-slate-600 max-w-md mx-auto">
+                        <?= $isExpired ? "Thời gian nhận đơn đã hết hạn lúc <strong class='text-slate-900'>" . date('H:i - d/m/Y', strtotime($event['deadline'])) . "</strong>." : "Admin đã khóa đơn sự kiện để tiến hành chốt danh sách gom hàng." ?>
+                    </p>
+                    <p class="text-[11px] text-slate-400">Bạn vẫn có thể theo dõi danh sách các thành viên đã đăng ký ở bên dưới.</p>
+                </div>
+            <?php else: ?>
+                <!-- Form Đăng Ký (Các ô input nền trắng 100%) -->
+                <form id="public-order-form" onsubmit="submitGroupBuyOrder(event)" class="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6 shadow-sm space-y-6">
+                    <input type="hidden" id="event-token" value="<?= htmlspecialchars($event['public_token']) ?>">
 
                 <!-- 1. Thông tin cá nhân -->
                 <div class="space-y-4">
@@ -442,7 +459,12 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                                     <div class="font-black text-slate-900 text-sm">
                                         <?= number_format($r['total_amount'], 0, ',', '.') ?> ₫
                                     </div>
-                                    <div>
+                                    <div class="flex items-center gap-1.5 flex-wrap justify-end">
+                                        <?php if ((int)($r['is_delivered'] ?? 0) === 1): ?>
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                                <i class="fa-solid fa-box-open text-[9px]"></i> Đã nhận áo
+                                            </span>
+                                        <?php endif; ?>
                                         <?php if ($isPaid): ?>
                                             <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                                                 <i class="fa-solid fa-check text-[9px]"></i> Đã thu tiền

@@ -238,12 +238,73 @@ foreach ($regsAfterDel as $r) {
 assert($found === false, "Đơn đăng ký vừa xóa không được còn trong danh sách");
 echo "✅ PASS (Đơn đăng ký #{$regToDeleteId} đã bị xóa hoàn toàn)\n";
 
-echo "[9/9] Kiểm thử Admin xóa sự kiện mua chung... ";
+echo "[9/11] Kiểm thử Admin xóa sự kiện mua chung... ";
 $delRes = $groupBuy->deleteEvent($event2['id']);
 assert($delRes === true, "deleteEvent phải trả về true");
 $deletedEvent = $groupBuy->getEventById($event2['id']);
 assert($deletedEvent === null, "Sự kiện sau khi xóa getEventById phải trả về null");
 echo "✅ PASS (Sự kiện và danh sách đơn đã được dọn sạch)\n";
 
-echo "\n🎉 TẤT CẢ 10/10 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
+// TEST 10: Kiểm thử toggleDelivered (Đã phát / nhận hàng)
+echo "[10/11] Kiểm thử Toggle Đã phát / Đã nhận hàng (toggleDelivered)... ";
+$event3 = $groupBuy->createEvent(
+    1, 1,
+    'Sự kiện test phát hàng',
+    'Mô tả',
+    null,
+    date('Y-m-d H:i:s', strtotime('+2 hours')),
+    [
+        ['name' => 'Mũ len', 'option_name' => 'Freesize', 'price' => 50000]
+    ]
+);
+$regDeliv = $groupBuy->register(
+    $event3['public_token'],
+    'Trần Văn B',
+    '0909090909',
+    '',
+    [['item_id' => $event3['items'][0]['id'], 'quantity' => 1]]
+);
+$toggleDelivRes = $groupBuy->toggleDelivered($regDeliv['registration_id'], true);
+assert($toggleDelivRes['is_delivered'] === 1, "is_delivered phải là 1 sau khi tick");
+$regs3 = $groupBuy->getRegistrations($event3['id']);
+assert((int)$regs3[0]['is_delivered'] === 1, "DB phải lưu is_delivered = 1");
+assert(!empty($regs3[0]['delivered_at']), "delivered_at phải có giá trị ngày giờ");
+$toggleDelivBack = $groupBuy->toggleDelivered($regDeliv['registration_id'], false);
+assert($toggleDelivBack['is_delivered'] === 0, "is_delivered phải về 0 sau khi bỏ tick");
+echo "✅ PASS (Toggle giao nhận hàng thành công)\n";
+
+// TEST 11: Kiểm thử sự kiện quá hạn deadline -> tự động đóng và chặn đăng ký
+echo "[11/11] Kiểm thử tự động đóng đơn khi quá hạn chót deadline... ";
+$pastDeadline = date('Y-m-d H:i:s', strtotime('-10 minutes'));
+$eventExpired = $groupBuy->createEvent(
+    1, 1,
+    'Sự kiện đã hết hạn',
+    'Quá hạn',
+    null,
+    $pastDeadline,
+    [
+        ['name' => 'Áo thun cũ', 'option_name' => 'Size M', 'price' => 100000]
+    ]
+);
+$fetchedExpired = $groupBuy->getEventById($eventExpired['id']);
+assert(!empty($fetchedExpired['is_expired']), "Sự kiện có deadline quá khứ phải có is_expired = true");
+
+$blocked = false;
+try {
+    $groupBuy->register(
+        $eventExpired['public_token'],
+        'Người đến muộn',
+        '0911111111',
+        '',
+        [['item_id' => $eventExpired['items'][0]['id'], 'quantity' => 1]]
+    );
+} catch (\Exception $e) {
+    if (str_contains($e->getMessage(), 'hết hạn')) {
+        $blocked = true;
+    }
+}
+assert($blocked === true, "Đăng ký sự kiện quá hạn phải bị từ chối với thông báo hết hạn");
+echo "✅ PASS (Chặn đăng ký thành công khi sự kiện đã quá hạn chót)\n";
+
+echo "\n🎉 TẤT CẢ 12/12 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
 echo "========================================================\n";

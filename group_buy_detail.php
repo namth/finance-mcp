@@ -23,10 +23,15 @@ $totalCollected = 0.0;
 $totalExpected = 0.0;
 $totalItemsCount = 0;
 
+$totalDelivered = 0;
+
 foreach ($registrations as $r) {
     $totalExpected += (float)$r['total_amount'];
     if ((int)$r['is_paid'] === 1) {
         $totalCollected += (float)$r['total_amount'];
+    }
+    if ((int)($r['is_delivered'] ?? 0) === 1) {
+        $totalDelivered++;
     }
 }
 
@@ -34,6 +39,7 @@ foreach ($breakdown as $b) {
     $totalItemsCount += (int)$b['total_quantity'];
 }
 
+$isExpired = !empty($event['deadline']) && strtotime($event['deadline']) <= time();
 $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . dirname($_SERVER['PHP_SELF']) . "/event.php?token=" . $event['public_token'];
 ?>
 
@@ -59,11 +65,15 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 <?php endif; ?>
 
                 <div>
-                    <div class="flex items-center gap-2 mb-1">
+                    <div class="flex items-center gap-2 mb-1 flex-wrap">
                         <?php if ($event['status'] === 'converted'): ?>
                             <span class="px-2.5 py-0.5 bg-purple-100 text-purple-800 rounded-full text-xs font-black">ĐÃ CHỐT HÓA ĐƠN #<?= $event['transaction_id'] ?></span>
                         <?php elseif ($event['status'] === 'closed'): ?>
                             <span class="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-bold">ĐÃ ĐÓNG ĐƠN</span>
+                        <?php elseif ($isExpired): ?>
+                            <span class="px-2.5 py-0.5 bg-rose-100 text-rose-800 rounded-full text-xs font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-clock-rotate-left"></i> ĐÃ HẾT HẠN
+                            </span>
                         <?php else: ?>
                             <span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">ĐANG NHẬN ĐƠN</span>
                         <?php endif; ?>
@@ -126,11 +136,12 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 <?php endforeach; ?>
             </div>
 
-            <!-- Dòng tổng hợp doanh thu đối soát -->
+            <!-- Dòng tổng hợp doanh thu đối soát & phát hàng -->
             <div class="flex flex-wrap items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs gap-3">
-                <div class="flex items-center gap-4">
+                <div class="flex items-center gap-4 flex-wrap">
                     <span>Tổng số người đặt: <strong class="text-slate-900"><?= $totalOrders ?></strong></span>
                     <span>Tổng tiền dự kiến: <strong class="text-slate-900"><?= number_format($totalExpected, 0, ',', '.') ?> ₫</strong></span>
+                    <span class="border-l border-slate-300 pl-4">Đã phát hàng: <strong class="text-blue-700 font-bold" id="stat-delivered-count"><?= $totalDelivered ?></strong> / <?= $totalOrders ?> đơn</span>
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-slate-500">Đã thu thực tế:</span>
@@ -141,12 +152,12 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
         </div>
     </div>
 
-    <!-- Bảng Danh Sách Người Đăng Ký & Nút Tick Đã Thu Tiền -->
+    <!-- Bảng Danh Sách Người Đăng Ký & Nút Tick Đã Thu Tiền / Phát Hàng -->
     <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs">
         <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
             <div>
                 <h2 class="text-sm sm:text-base font-bold text-slate-900">Danh sách đơn đăng ký (<?= count($registrations) ?>)</h2>
-                <p class="text-xs text-slate-400">Tick trực tiếp vào ô để xác nhận đã nhận chuyển khoản của từng người</p>
+                <p class="text-xs text-slate-400">Tick trực tiếp vào ô để xác nhận thu tiền hoặc đánh dấu khi đã phát hàng cho người nhận</p>
             </div>
         </div>
 
@@ -163,6 +174,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                             <th class="py-3 px-4">Món / Size đã chọn</th>
                             <th class="py-3 px-4">Số tiền</th>
                             <th class="py-3 px-4 text-center">Trạng thái thanh toán</th>
+                            <th class="py-3 px-4 text-center">Phát / Nhận hàng</th>
                             <th class="py-3 px-4 text-right">Thời gian</th>
                             <th class="py-3 px-3 text-center w-12">Xóa</th>
                         </tr>
@@ -172,6 +184,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                             <?php
                                 $isPaid = (int)$r['is_paid'] === 1;
                                 $isNotified = (int)$r['is_notified_paid'] === 1;
+                                $isDelivered = (int)($r['is_delivered'] ?? 0) === 1;
                             ?>
                             <tr class="hover:bg-slate-50/50 transition <?= $isPaid ? '' : ($isNotified ? 'bg-amber-50/30' : '') ?>">
                                 <td class="py-3.5 px-4">
@@ -202,6 +215,15 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                                                onchange="togglePaidStatus(<?= $r['id'] ?>, this)" 
                                                class="w-4 h-4 rounded text-emerald-600 focus:ring-0">
                                         <span class="status-label-text"><?= $isPaid ? 'Đã thu tiền' : ($isNotified ? 'Khách báo đã CK' : 'Chưa thu tiền') ?></span>
+                                    </label>
+                                </td>
+                                <td class="py-3.5 px-4 text-center">
+                                    <label class="inline-flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full font-bold transition <?= $isDelivered ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-slate-100 text-slate-600' ?>">
+                                        <input type="checkbox" 
+                                               <?= $isDelivered ? 'checked' : '' ?> 
+                                               onchange="toggleDeliveredStatus(<?= $r['id'] ?>, this)" 
+                                               class="w-4 h-4 rounded text-blue-600 focus:ring-0">
+                                        <span class="delivery-label-text"><?= $isDelivered ? 'Đã nhận hàng' : 'Chưa nhận' ?></span>
                                     </label>
                                 </td>
                                 <td class="py-3.5 px-4 text-right text-slate-400 text-[11px]">
@@ -379,6 +401,48 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
             } else {
                 checkbox.checked = !checkbox.checked;
                 alert(data.message || 'Lỗi cập nhật trạng thái thu tiền');
+            }
+        })
+        .catch(err => {
+            checkbox.checked = !checkbox.checked;
+            alert('Lỗi kết nối: ' + err.message);
+        });
+    }
+
+    function toggleDeliveredStatus(regId, checkbox) {
+        const isDelivered = checkbox.checked ? 1 : 0;
+        const parentLabel = checkbox.closest('label');
+        const textSpan = parentLabel.querySelector('.delivery-label-text');
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_toggle_delivered');
+        formData.append('registration_id', regId);
+        formData.append('is_delivered', isDelivered);
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                if (isDelivered === 1) {
+                    parentLabel.className = "inline-flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full font-bold transition bg-blue-50 text-blue-700 border border-blue-200";
+                    textSpan.innerText = "Đã nhận hàng";
+                } else {
+                    parentLabel.className = "inline-flex items-center gap-1.5 cursor-pointer px-3 py-1.5 rounded-full font-bold transition bg-slate-100 text-slate-600";
+                    textSpan.innerText = "Chưa nhận";
+                }
+                // Cập nhật số đếm trên giao diện
+                const statEl = document.getElementById('stat-delivered-count');
+                if (statEl) {
+                    let cur = parseInt(statEl.innerText || '0', 10);
+                    cur = isDelivered === 1 ? cur + 1 : Math.max(0, cur - 1);
+                    statEl.innerText = cur;
+                }
+            } else {
+                checkbox.checked = !checkbox.checked;
+                alert(data.message || 'Lỗi cập nhật trạng thái phát hàng');
             }
         })
         .catch(err => {

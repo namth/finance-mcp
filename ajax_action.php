@@ -1,5 +1,7 @@
 <?php
 
+date_default_timezone_set('Asia/Ho_Chi_Minh');
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -110,6 +112,25 @@ try {
                 'success' => true,
                 'data'    => $res,
                 'message' => $res['is_paid'] === 1 ? 'Đã xác nhận thu tiền!' : 'Đã bỏ xác nhận thu tiền.',
+            ]);
+            exit;
+
+        // ==========================================
+        // 3b. ADMIN: TICK TOGGLE ĐÃ PHÁT / NHẬN HÀNG
+        // ==========================================
+        case 'group_buy_toggle_delivered':
+            $regId = (int)($_POST['registration_id'] ?? 0);
+            if ($regId <= 0) {
+                throw new \InvalidArgumentException("ID đơn đăng ký không hợp lệ.");
+            }
+
+            $isDelivered = isset($_POST['is_delivered']) ? (bool)$_POST['is_delivered'] : null;
+            $res = $groupBuyModel->toggleDelivered($regId, $isDelivered);
+
+            echo json_encode([
+                'success' => true,
+                'data'    => $res,
+                'message' => $res['is_delivered'] === 1 ? 'Đã xác nhận đã phát / nhận hàng!' : 'Đã bỏ xác nhận nhận hàng.',
             ]);
             exit;
 

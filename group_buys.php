@@ -119,7 +119,8 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
             <?php foreach ($events as $ev): ?>
                 <?php
                     $isConverted = $ev['status'] === 'converted';
-                    $isClosed = $ev['status'] === 'closed';
+                    $isExpired = !empty($ev['deadline']) && strtotime($ev['deadline']) <= time();
+                    $isClosed = ($ev['status'] === 'closed') || $isExpired;
                     $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]" . dirname($_SERVER['PHP_SELF']) . "/event.php?token=" . $ev['public_token'];
                 ?>
                 <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-md transition flex flex-col justify-between">
@@ -132,6 +133,8 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
                                 <div class="absolute top-3 right-3">
                                     <?php if ($isConverted): ?>
                                         <span class="px-2.5 py-1 bg-purple-600/90 text-white rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">Đã chốt hóa đơn</span>
+                                    <?php elseif ($isExpired): ?>
+                                        <span class="px-2.5 py-1 bg-rose-600/90 text-white rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">Đã hết hạn</span>
                                     <?php elseif ($isClosed): ?>
                                         <span class="px-2.5 py-1 bg-slate-600/90 text-white rounded-full text-[10px] font-black uppercase tracking-wider backdrop-blur-xs">Đã đóng đơn</span>
                                     <?php else: ?>
@@ -144,6 +147,8 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
                                 <span class="text-xs font-bold opacity-80">Sự kiện #<?= $ev['id'] ?></span>
                                 <?php if ($isConverted): ?>
                                     <span class="px-2 py-0.5 bg-white/20 text-white rounded-full text-[10px] font-bold">Đã chốt hóa đơn</span>
+                                <?php elseif ($isExpired): ?>
+                                    <span class="px-2 py-0.5 bg-rose-600/90 text-white rounded-full text-[10px] font-bold">Đã hết hạn</span>
                                 <?php elseif ($isClosed): ?>
                                     <span class="px-2 py-0.5 bg-white/20 text-white rounded-full text-[10px] font-bold">Đã đóng đơn</span>
                                 <?php else: ?>

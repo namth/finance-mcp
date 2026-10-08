@@ -355,6 +355,13 @@ if ($runMigration) {
             $pdo->exec($patchContent);
             $migrationResult .= ' & patch_event_image.sql thành công!';
         }
+
+        $patchDelivered = __DIR__ . '/patch_delivered_and_timezone.sql';
+        if (file_exists($patchDelivered)) {
+            $patchDeliveredContent = file_get_contents($patchDelivered);
+            $pdo->exec($patchDeliveredContent);
+            $migrationResult .= ' & patch_delivered_and_timezone.sql thành công!';
+        }
     } catch (\Throwable $e) {
         $migrationResult = 'Lỗi migration CSDL: ' . $e->getMessage();
     }

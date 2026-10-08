@@ -13,6 +13,7 @@ class GroupBuy
 
     public function __construct(?PDO $db = null)
     {
+        date_default_timezone_set('Asia/Ho_Chi_Minh');
         $this->db = $db ?? Database::getConnection();
         $this->ensureSchema();
     }
@@ -67,6 +68,8 @@ class GroupBuy
                         is_notified_paid INTEGER NOT NULL DEFAULT 0,
                         is_paid INTEGER NOT NULL DEFAULT 0,
                         paid_at DATETIME DEFAULT NULL,
+                        is_delivered INTEGER NOT NULL DEFAULT 0,
+                        delivered_at DATETIME DEFAULT NULL,
                         reg_token TEXT NOT NULL UNIQUE,
                         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                         FOREIGN KEY (event_id) REFERENCES group_buy_events(id) ON DELETE CASCADE
@@ -125,6 +128,8 @@ class GroupBuy
                         `is_notified_paid` TINYINT(1) NOT NULL DEFAULT 0,
                         `is_paid` TINYINT(1) NOT NULL DEFAULT 0,
                         `paid_at` DATETIME DEFAULT NULL,
+                        `is_delivered` TINYINT(1) NOT NULL DEFAULT 0,
+                        `delivered_at` DATETIME DEFAULT NULL,
                         `reg_token` VARCHAR(64) NOT NULL UNIQUE,
                         `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
                         INDEX `idx_gbr_event` (`event_id`),
@@ -142,6 +147,15 @@ class GroupBuy
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
                 ");
             }
+
+            // Tự động kiểm tra và thêm cột is_delivered nếu chưa có (migration an toàn)
+            try {
+                $this->db->exec("ALTER TABLE group_buy_registrations ADD COLUMN is_delivered TINYINT(1) NOT NULL DEFAULT 0");
+            } catch (\Throwable $e) {}
+            try {
+                $this->db->exec("ALTER TABLE group_buy_registrations ADD COLUMN delivered_at DATETIME DEFAULT NULL");
+            } catch (\Throwable $e) {}
+
             self::$schemaEnsured = true;
         } catch (\Throwable $e) {
             // Log hoặc bỏ qua nếu đã tồn tại
@@ -258,7 +272,11 @@ class GroupBuy
             ORDER BY e.id DESC
         ");
         $stmt->execute([':group_id' => $groupId]);
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $r['is_expired'] = !empty($r['deadline']) && strtotime($r['deadline']) <= time();
+        }
+        return $rows;
     }
 
     /**
@@ -276,6 +294,7 @@ class GroupBuy
         $event = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$event) return null;
 
+        $event['is_expired'] = !empty($event['deadline']) && strtotime($event['deadline']) <= time();
         $event['items'] = $this->getItemsByEventId($id);
         return $event;
     }
@@ -295,6 +314,7 @@ class GroupBuy
         $event = $stmt->fetch(PDO::FETCH_ASSOC);
         if (!$event) return null;
 
+        $event['is_expired'] = !empty($event['deadline']) && strtotime($event['deadline']) <= time();
         $event['items'] = $this->getItemsByEventId((int)$event['id']);
         return $event;
     }
@@ -324,8 +344,10 @@ class GroupBuy
             throw new InvalidArgumentException("Sự kiện mua chung không tồn tại hoặc link không hợp lệ.");
         }
 
-        if ($event['status'] !== 'open') {
-            throw new InvalidArgumentException("Sự kiện này đã kết thúc nhận đăng ký ({$event['status']}).");
+        $isExpired = !empty($event['deadline']) && strtotime($event['deadline']) <= time();
+        if ($event['status'] !== 'open' || $isExpired) {
+            $deadlineNote = !empty($event['deadline']) ? " (Hạn chót: " . date('H:i d/m/Y', strtotime($event['deadline'])) . ")" : "";
+            throw new InvalidArgumentException("Sự kiện này đã hết hạn nhận đăng ký{$deadlineNote}.");
         }
 
         $participantName = trim($participantName);
@@ -497,6 +519,41 @@ class GroupBuy
             'registration_id' => $registrationId,
             'is_paid'         => $newPaid,
             'paid_at'         => $newPaid === 1 ? date('Y-m-d H:i:s') : null,
+        ];
+    }
+
+    /**
+     * Admin toggle trạng thái đã phát / nhận hàng của người đăng ký
+     */
+    public function toggleDelivered(int $registrationId, ?bool $isDelivered = null): array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM group_buy_registrations WHERE id = :id");
+        $stmt->execute([':id' => $registrationId]);
+        $reg = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$reg) {
+            throw new InvalidArgumentException("Không tìm thấy đơn đăng ký #{$registrationId}.");
+        }
+
+        $newStatus = ($isDelivered !== null) ? ($isDelivered ? 1 : 0) : ((int)($reg['is_delivered'] ?? 0) === 1 ? 0 : 1);
+        $deliveredAt = ($newStatus === 1) ? date('Y-m-d H:i:s') : null;
+
+        $update = $this->db->prepare("
+            UPDATE group_buy_registrations
+            SET is_delivered = :is_delivered,
+                delivered_at = :delivered_at
+            WHERE id = :id
+        ");
+        $update->execute([
+            ':is_delivered' => $newStatus,
+            ':delivered_at' => $deliveredAt,
+            ':id'           => $registrationId,
+        ]);
+
+        return [
+            'success'         => true,
+            'registration_id' => $registrationId,
+            'is_delivered'    => $newStatus,
+            'delivered_at'    => $deliveredAt,
         ];
     }
 

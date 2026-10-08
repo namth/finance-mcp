@@ -225,12 +225,25 @@ $reloadedEvent = $groupBuy->getEventById($event2['id']);
 assert($reloadedEvent['deadline'] === $newDeadline, "Deadline mới phải được lưu chính xác");
 echo "✅ PASS (Hạn chót mới: {$newDeadline})\n";
 
-echo "[8/8] Kiểm thử Admin xóa sự kiện mua chung... ";
+// TEST 8: Kiểm thử xóa đơn đăng ký nhầm (deleteRegistration)
+echo "[8/9] Kiểm thử Admin xóa đơn đăng ký nhầm của người dùng... ";
+$regToDeleteId = $reg['registration_id'];
+$delRegRes = $groupBuy->deleteRegistration($regToDeleteId);
+assert($delRegRes === true, "deleteRegistration phải trả về true");
+$regsAfterDel = $groupBuy->getRegistrations($event['id']);
+$found = false;
+foreach ($regsAfterDel as $r) {
+    if ((int)$r['id'] === $regToDeleteId) $found = true;
+}
+assert($found === false, "Đơn đăng ký vừa xóa không được còn trong danh sách");
+echo "✅ PASS (Đơn đăng ký #{$regToDeleteId} đã bị xóa hoàn toàn)\n";
+
+echo "[9/9] Kiểm thử Admin xóa sự kiện mua chung... ";
 $delRes = $groupBuy->deleteEvent($event2['id']);
 assert($delRes === true, "deleteEvent phải trả về true");
 $deletedEvent = $groupBuy->getEventById($event2['id']);
 assert($deletedEvent === null, "Sự kiện sau khi xóa getEventById phải trả về null");
 echo "✅ PASS (Sự kiện và danh sách đơn đã được dọn sạch)\n";
 
-echo "\n🎉 TẤT CẢ 9/9 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
+echo "\n🎉 TẤT CẢ 10/10 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
 echo "========================================================\n";

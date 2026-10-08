@@ -164,6 +164,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                             <th class="py-3 px-4">Số tiền</th>
                             <th class="py-3 px-4 text-center">Trạng thái thanh toán</th>
                             <th class="py-3 px-4 text-right">Thời gian</th>
+                            <th class="py-3 px-3 text-center w-12">Xóa</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -205,6 +206,14 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                                 </td>
                                 <td class="py-3.5 px-4 text-right text-slate-400 text-[11px]">
                                     <?= date('H:i d/m', strtotime($r['created_at'])) ?>
+                                </td>
+                                <td class="py-3.5 px-3 text-center">
+                                    <button type="button" 
+                                            onclick="deleteRegistration(<?= $r['id'] ?>, '<?= htmlspecialchars(addslashes($r['participant_name'])) ?>')" 
+                                            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition" 
+                                            title="Xóa đơn đăng ký nhầm này">
+                                        <i class="fa-regular fa-trash-can"></i>
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -309,6 +318,33 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 window.location.href = data.redirect_url || 'group_buys.php';
             } else {
                 alert(data.message || 'Lỗi khi xóa sự kiện');
+            }
+        })
+        .catch(err => {
+            alert('Lỗi kết nối: ' + err.message);
+        });
+    }
+
+    function deleteRegistration(regId, name) {
+        if (!confirm(`Bạn có chắc chắn muốn xóa đơn đăng ký của "${name}" không?\n\nĐơn hàng này sẽ bị xóa khỏi danh sách và bảng tổng hợp.`)) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_delete_registration');
+        formData.append('registration_id', regId);
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Đã xóa đơn đăng ký!');
+                location.reload();
+            } else {
+                alert(data.message || 'Lỗi khi xóa đơn đăng ký');
             }
         })
         .catch(err => {

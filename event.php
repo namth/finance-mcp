@@ -26,6 +26,7 @@ if (!empty($token)) {
     $error = "Thiếu mã xác thực sự kiện (token). Vui lòng kiểm tra lại đường dẫn!";
 }
 
+$registrations = ($event && !empty($event['id'])) ? $groupBuyModel->getRegistrations((int)$event['id']) : [];
 $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "Sự Kiện Mua Chung - SimpleFinance";
 ?>
 <!DOCTYPE html>
@@ -306,6 +307,118 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
             </form>
         <?php endif; ?>
 
+        <!-- Danh Sách Người Đã Đăng Ký Mua Chung -->
+        <?php if ($event): ?>
+            <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs">
+                <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm sm:text-base font-bold text-slate-900 flex items-center gap-2">
+                            <i class="fa-solid fa-users text-emerald-600"></i>
+                            Danh Sách Đã Đăng Ký (<?= count($registrations) ?>)
+                        </h3>
+                        <p class="text-[11px] sm:text-xs text-slate-400 mt-0.5">Các thành viên trong nhóm đã gửi đơn đặt hàng</p>
+                    </div>
+                    <?php
+                        $totalPieces = 0;
+                        foreach ($registrations as $reg) {
+                            if (!empty($reg['items'])) {
+                                foreach ($reg['items'] as $it) {
+                                    $totalPieces += (int)$it['quantity'];
+                                }
+                            }
+                        }
+                    ?>
+                    <?php if ($totalPieces > 0): ?>
+                        <span class="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full text-xs font-bold">
+                            Tổng <?= $totalPieces ?> món
+                        </span>
+                    <?php endif; ?>
+                </div>
+
+                <?php if (empty($registrations)): ?>
+                    <div class="p-8 text-center text-slate-400 text-xs">
+                        <i class="fa-regular fa-clipboard text-2xl block mb-2 opacity-50"></i>
+                        Chưa có ai đăng ký. Hãy là người đầu tiên tham gia sự kiện này!
+                    </div>
+                <?php else: ?>
+                    <div class="divide-y divide-slate-100">
+                        <?php foreach ($registrations as $idx => $r): ?>
+                            <?php
+                                $isPaid = (int)$r['is_paid'] === 1;
+                                $isNotified = (int)$r['is_notified_paid'] === 1;
+                                // Che số điện thoại bảo mật (ví dụ: 0912***789)
+                                $phoneDisplay = '';
+                                if (!empty($r['participant_phone'])) {
+                                    $rawP = trim($r['participant_phone']);
+                                    if (strlen($rawP) >= 7) {
+                                        $phoneDisplay = substr($rawP, 0, 4) . '***' . substr($rawP, -3);
+                                    } else {
+                                        $phoneDisplay = $rawP;
+                                    }
+                                }
+                            ?>
+                            <div class="p-4 sm:p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition">
+                                <div class="flex items-start gap-3">
+                                    <div class="w-9 h-9 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center font-black text-xs flex-shrink-0 mt-0.5">
+                                        <?= mb_strtoupper(mb_substr(trim($r['participant_name']), 0, 1, 'UTF-8'), 'UTF-8') ?>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <span class="font-bold text-slate-900 text-sm"><?= htmlspecialchars($r['participant_name']) ?></span>
+                                            <?php if ($phoneDisplay): ?>
+                                                <span class="text-[11px] text-slate-400 font-mono">(<?= htmlspecialchars($phoneDisplay) ?>)</span>
+                                            <?php endif; ?>
+                                        </div>
+                                        
+                                        <!-- Danh sách size/món đã chọn -->
+                                        <div class="flex flex-wrap gap-1.5 pt-0.5">
+                                            <?php if (!empty($r['items'])): ?>
+                                                <?php foreach ($r['items'] as $it): ?>
+                                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-medium border border-slate-200">
+                                                        <strong class="text-emerald-700"><?= $it['quantity'] ?>x</strong> <?= htmlspecialchars($it['option_name']) ?>
+                                                    </span>
+                                                <?php endforeach; ?>
+                                            <?php else: ?>
+                                                <span class="text-xs text-slate-600"><?= $r['items_summary'] ?? 'Chi tiết món' ?></span>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <?php if (!empty($r['note'])): ?>
+                                            <div class="text-[11px] text-slate-500 italic">
+                                                <i class="fa-regular fa-comment-dots text-slate-400"></i> <?= htmlspecialchars($r['note']) ?>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+
+                                <div class="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-100 text-right gap-1 flex-shrink-0">
+                                    <div class="font-black text-slate-900 text-sm">
+                                        <?= number_format($r['total_amount'], 0, ',', '.') ?> ₫
+                                    </div>
+                                    <div>
+                                        <?php if ($isPaid): ?>
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                <i class="fa-solid fa-check text-[9px]"></i> Đã thu tiền
+                                            </span>
+                                        <?php elseif ($isNotified): ?>
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                                <i class="fa-solid fa-clock text-[9px]"></i> Đã báo CK
+                                            </span>
+                                        <?php else: ?>
+                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-500">
+                                                Chờ thanh toán
+                                            </span>
+                                        <?php endif; ?>
+                                        <span class="text-[10px] text-slate-400 ml-1"><?= date('H:i d/m', strtotime($r['created_at'])) ?></span>
+                                    </div>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
+            </div>
+        <?php endif; ?>
+
     </div>
 
     <!-- POPUP / MODAL VIETQR SAU KHI ĐẶT HÀNG -->
@@ -474,6 +587,7 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
 
         function closeModalQR() {
             document.getElementById('modal-qr').classList.add('hidden');
+            location.reload();
         }
 
         function notifyTransferDone() {

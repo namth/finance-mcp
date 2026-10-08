@@ -168,6 +168,22 @@ try {
             exit;
 
         // ==========================================
+        // 4d. ADMIN: XÓA ĐƠN ĐĂNG KÝ (ĐĂNG KÝ NHẦM)
+        // ==========================================
+        case 'group_buy_delete_registration':
+            $regId = (int)($_POST['registration_id'] ?? 0);
+            if ($regId <= 0) {
+                throw new \InvalidArgumentException("ID đơn đăng ký không hợp lệ.");
+            }
+            $groupBuyModel->deleteRegistration($regId);
+
+            echo json_encode([
+                'success' => true,
+                'message' => 'Đã xóa đơn đăng ký thành công!',
+            ]);
+            exit;
+
+        // ==========================================
         // 5. CÁC HÀNH ĐỘNG CŨ (PLACE, PRODUCT, TRANSACTION)
         // ==========================================
         case 'quick_place_create':

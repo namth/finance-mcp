@@ -730,6 +730,36 @@ class GroupBuy
     }
 
     /**
+     * Xóa 1 đơn đăng ký (trong trường hợp người dùng đăng ký nhầm)
+     */
+    public function deleteRegistration(int $registrationId): bool
+    {
+        $stmt = $this->db->prepare("SELECT id, event_id FROM group_buy_registrations WHERE id = :id");
+        $stmt->execute([':id' => $registrationId]);
+        $reg = $stmt->fetch();
+        if (!$reg) {
+            throw new InvalidArgumentException("Không tìm thấy đơn đăng ký #{$registrationId}.");
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Xóa các chi tiết món của đơn
+            $delItems = $this->db->prepare("DELETE FROM group_buy_registration_items WHERE registration_id = :id");
+            $delItems->execute([':id' => $registrationId]);
+
+            // Xóa đơn đăng ký
+            $delReg = $this->db->prepare("DELETE FROM group_buy_registrations WHERE id = :id");
+            $delReg->execute([':id' => $registrationId]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
      * Xóa sự kiện mua chung
      */
     public function deleteEvent(int $eventId): bool

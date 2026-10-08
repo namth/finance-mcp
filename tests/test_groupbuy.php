@@ -216,6 +216,21 @@ $mcpData = json_decode($mcpRes['result']['content'][0]['text'], true);
 assert($mcpData['success'] === true, "MCP Đăng ký phải thành công");
 assert($mcpData['total_amount'] == 70000, "MCP Đăng ký tổng tiền phải là 70,000 VND");
 echo "✅ PASS (MCP AI Agent đăng ký thành công đơn 70.000 ₫)\n";
+// TEST 7: Kiểm thử đổi hạn chót (updateDeadline) và xóa sự kiện (deleteEvent)
+echo "\n[7/8] Kiểm thử Admin đổi hạn chót sự kiện... ";
+$newDeadline = date('Y-m-d H:i:s', strtotime('+3 days'));
+$updRes = $groupBuy->updateDeadline($event2['id'], $newDeadline);
+assert($updRes['success'] === true, "updateDeadline phải trả về success = true");
+$reloadedEvent = $groupBuy->getEventById($event2['id']);
+assert($reloadedEvent['deadline'] === $newDeadline, "Deadline mới phải được lưu chính xác");
+echo "✅ PASS (Hạn chót mới: {$newDeadline})\n";
 
-echo "\n🎉 TẤT CẢ 7/7 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
+echo "[8/8] Kiểm thử Admin xóa sự kiện mua chung... ";
+$delRes = $groupBuy->deleteEvent($event2['id']);
+assert($delRes === true, "deleteEvent phải trả về true");
+$deletedEvent = $groupBuy->getEventById($event2['id']);
+assert($deletedEvent === null, "Sự kiện sau khi xóa getEventById phải trả về null");
+echo "✅ PASS (Sự kiện và danh sách đơn đã được dọn sạch)\n";
+
+echo "\n🎉 TẤT CẢ 9/9 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
 echo "========================================================\n";

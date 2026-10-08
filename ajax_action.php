@@ -133,6 +133,41 @@ try {
             exit;
 
         // ==========================================
+        // 4b. ADMIN: CHỈNH SỬA THỜI HẠN SỰ KIỆN
+        // ==========================================
+        case 'group_buy_update_deadline':
+            $eventId = (int)($_POST['event_id'] ?? 0);
+            if ($eventId <= 0) {
+                throw new \InvalidArgumentException("ID sự kiện không hợp lệ.");
+            }
+            $deadline = trim((string)($_POST['deadline'] ?? ''));
+            $res = $groupBuyModel->updateDeadline($eventId, $deadline ?: null);
+
+            echo json_encode([
+                'success'  => true,
+                'message'  => 'Đã cập nhật thời hạn sự kiện thành công!',
+                'deadline' => $deadline,
+            ]);
+            exit;
+
+        // ==========================================
+        // 4c. ADMIN: XÓA SỰ KIỆN MUA CHUNG
+        // ==========================================
+        case 'group_buy_delete':
+            $eventId = (int)($_POST['event_id'] ?? 0);
+            if ($eventId <= 0) {
+                throw new \InvalidArgumentException("ID sự kiện không hợp lệ.");
+            }
+            $groupBuyModel->deleteEvent($eventId);
+
+            echo json_encode([
+                'success'      => true,
+                'message'      => 'Đã xóa sự kiện mua chung thành công!',
+                'redirect_url' => 'group_buys.php',
+            ]);
+            exit;
+
+        // ==========================================
         // 5. CÁC HÀNH ĐỘNG CŨ (PLACE, PRODUCT, TRANSACTION)
         // ==========================================
         case 'quick_place_create':

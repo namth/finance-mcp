@@ -88,9 +88,15 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 <a href="event.php?token=<?= htmlspecialchars($event['public_token']) ?>" target="_blank" class="px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-2xs">
                     <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Trang Đăng Ký
                 </a>
+                <button type="button" onclick="openEditDeadlineModal()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-2xs" title="Chỉnh sửa thời gian hết hạn">
+                    <i class="fa-regular fa-clock text-amber-600"></i> Đổi Hạn Chót
+                </button>
                 <?php if ($event['status'] !== 'converted'): ?>
                     <button type="button" onclick="convertToTransaction(<?= $event['id'] ?>)" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-invoice-dollar"></i> Chốt & Tạo Hóa Đơn Nhóm
+                        <i class="fa-solid fa-file-invoice-dollar"></i> Chốt Hóa Đơn
+                    </button>
+                    <button type="button" onclick="deleteEvent(<?= $event['id'] ?>)" class="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5" title="Xóa sự kiện này">
+                        <i class="fa-regular fa-trash-can"></i> Xóa
                     </button>
                 <?php else: ?>
                     <a href="transaction_detail.php?id=<?= $event['transaction_id'] ?>" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-2xl shadow-md transition flex items-center gap-1.5">
@@ -208,12 +214,106 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
         <?php endif; ?>
     </div>
 
+    <!-- Modal Đổi Hạn Chót -->
+    <div id="modal-edit-deadline" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl space-y-4">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div>
+                    <h3 class="text-base font-black text-slate-900">Thay Đổi Hạn Chót Sự Kiện</h3>
+                    <p class="text-xs text-slate-400">Gia hạn hoặc rút ngắn thời gian nhận đăng ký</p>
+                </div>
+                <button type="button" onclick="closeEditDeadlineModal()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-edit-deadline" onsubmit="submitUpdateDeadline(event, <?= (int)$event['id'] ?>)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Thời hạn mới</label>
+                    <input type="datetime-local" id="input-new-deadline" value="<?= !empty($event['deadline']) ? date('Y-m-d\TH:i', strtotime($event['deadline'])) : '' ?>" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    <p class="text-[11px] text-slate-400 mt-1">Để trống nếu muốn bỏ giới hạn thời gian.</p>
+                </div>
+
+                <div class="pt-2 flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeEditDeadlineModal()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition">
+                        Hủy bỏ
+                    </button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-md transition">
+                        Lưu thời hạn
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <script>
     function copyPublicLink(url) {
         navigator.clipboard?.writeText(url);
         alert('Đã sao chép link đặt hàng công khai:\n' + url);
+    }
+
+    function openEditDeadlineModal() {
+        document.getElementById('modal-edit-deadline').classList.remove('hidden');
+    }
+
+    function closeEditDeadlineModal() {
+        document.getElementById('modal-edit-deadline').classList.add('hidden');
+    }
+
+    function submitUpdateDeadline(event, eventId) {
+        event.preventDefault();
+        const deadlineVal = document.getElementById('input-new-deadline').value;
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_update_deadline');
+        formData.append('event_id', eventId);
+        formData.append('deadline', deadlineVal);
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Đã cập nhật hạn chót!');
+                location.reload();
+            } else {
+                alert(data.message || 'Lỗi cập nhật thời hạn');
+            }
+        })
+        .catch(err => {
+            alert('Lỗi kết nối: ' + err.message);
+        });
+    }
+
+    function deleteEvent(eventId) {
+        if (!confirm('Bạn có chắc chắn muốn xóa sự kiện này và toàn bộ danh sách đăng ký liên quan không?\n\nHành động này không thể hoàn tác!')) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_delete');
+        formData.append('event_id', eventId);
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Đã xóa sự kiện!');
+                window.location.href = data.redirect_url || 'group_buys.php';
+            } else {
+                alert(data.message || 'Lỗi khi xóa sự kiện');
+            }
+        })
+        .catch(err => {
+            alert('Lỗi kết nối: ' + err.message);
+        });
     }
 
     function togglePaidStatus(regId, checkbox) {

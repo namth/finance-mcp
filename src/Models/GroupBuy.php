@@ -705,6 +705,60 @@ class GroupBuy
         ];
     }
 
+    /**
+     * Cập nhật thời gian hết hạn (deadline) của sự kiện
+     */
+    public function updateDeadline(int $eventId, ?string $deadline): array
+    {
+        $event = $this->getEventById($eventId);
+        if (!$event) {
+            throw new InvalidArgumentException("Không tìm thấy sự kiện #{$eventId}.");
+        }
+
+        $stmt = $this->db->prepare("UPDATE group_buy_events SET deadline = :deadline WHERE id = :id");
+        $stmt->execute([
+            ':deadline' => !empty($deadline) ? $deadline : null,
+            ':id'       => $eventId,
+        ]);
+
+        return [
+            'success'  => true,
+            'event_id' => $eventId,
+            'deadline' => $deadline,
+            'message'  => 'Đã cập nhật thời hạn đăng ký thành công!',
+        ];
+    }
+
+    /**
+     * Xóa sự kiện mua chung
+     */
+    public function deleteEvent(int $eventId): bool
+    {
+        $event = $this->getEventById($eventId);
+        if (!$event) {
+            throw new InvalidArgumentException("Không tìm thấy sự kiện #{$eventId}.");
+        }
+
+        $this->db->beginTransaction();
+        try {
+            // Xóa chi tiết món đăng ký
+            $this->db->exec("DELETE FROM group_buy_registration_items WHERE registration_id IN (SELECT id FROM group_buy_registrations WHERE event_id = {$eventId})");
+            // Xóa lượt đăng ký
+            $this->db->exec("DELETE FROM group_buy_registrations WHERE event_id = {$eventId}");
+            // Xóa món/size
+            $this->db->exec("DELETE FROM group_buy_items WHERE event_id = {$eventId}");
+            // Xóa sự kiện
+            $stmt = $this->db->prepare("DELETE FROM group_buy_events WHERE id = :id");
+            $stmt->execute([':id' => $eventId]);
+
+            $this->db->commit();
+            return true;
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
     private function removeVietnameseAccents(string $str): string
     {
         $unicode = [

@@ -178,9 +178,14 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
 
                     <!-- Footer card buttons -->
                     <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
-                        <button type="button" onclick="copyLink('<?= htmlspecialchars($publicUrl) ?>')" class="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 transition flex items-center gap-1.5" title="Sao chép link gửi Zalo/Messenger">
-                            <i class="fa-regular fa-copy text-slate-400"></i> Copy Link
-                        </button>
+                        <div class="flex items-center gap-1.5">
+                            <button type="button" onclick="copyLink('<?= htmlspecialchars($publicUrl) ?>')" class="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 transition flex items-center gap-1.5" title="Sao chép link gửi Zalo/Messenger">
+                                <i class="fa-regular fa-copy text-slate-400"></i> Copy Link
+                            </button>
+                            <button type="button" onclick="deleteEvent(<?= (int)$ev['id'] ?>)" class="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 rounded-xl text-xs transition" title="Xóa sự kiện này">
+                                <i class="fa-regular fa-trash-can"></i>
+                            </button>
+                        </div>
                         <a href="group_buy_detail.php?id=<?= $ev['id'] ?>" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1">
                             Quản lý & Thu tiền &rarr;
                         </a>
@@ -302,6 +307,33 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
     function copyLink(url) {
         navigator.clipboard?.writeText(url);
         alert('Đã sao chép link sự kiện vào bộ nhớ tạm: ' + url);
+    }
+
+    function deleteEvent(eventId) {
+        if (!confirm('Bạn có chắc chắn muốn xóa sự kiện này và toàn bộ danh sách đăng ký không?\n\nHành động này không thể hoàn tác!')) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_delete');
+        formData.append('event_id', eventId);
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Đã xóa sự kiện thành công!');
+                location.reload();
+            } else {
+                alert(data.message || 'Lỗi khi xóa sự kiện');
+            }
+        })
+        .catch(err => {
+            alert('Lỗi kết nối: ' + err.message);
+        });
     }
 </script>
 

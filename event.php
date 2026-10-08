@@ -162,13 +162,13 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                             <input type="text" id="order-name" required placeholder="Ví dụ: Nguyễn Văn A" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition shadow-2xs">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1">Số điện thoại / Nickname Zalo <span class="text-red-500">*</span></label>
-                            <input type="text" id="order-phone" required placeholder="Ví dụ: 0912345678" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition shadow-2xs">
+                            <label class="block text-xs font-semibold text-slate-700 mb-1">Số điện thoại / Nickname Zalo (tùy chọn)</label>
+                            <input type="text" id="order-phone" placeholder="Ví dụ: 0912345678 hoặc Nam Trần" class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition shadow-2xs">
                         </div>
                     </div>
                     <div>
                         <label class="block text-xs font-semibold text-slate-700 mb-1">Ghi chú (tùy chọn)</label>
-                        <input type="text" id="order-note" placeholder="Ví dụ: Lấy form rộng rãi, in tên mặt sau áo..." class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition shadow-2xs">
+                        <input type="text" id="order-note" placeholder="Ví dụ: In thêm tên, lấy form rộng rãi..." class="w-full px-3.5 py-2.5 text-sm bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 focus:outline-none transition shadow-2xs">
                     </div>
                 </div>
 
@@ -179,35 +179,118 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-bold text-slate-900 flex items-center gap-2">
                             <span class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-black">2</span>
-                            Chọn phân loại / Kích cỡ
+                            Chọn kích cỡ & số lượng
                         </h3>
-                        <span class="text-[11px] text-slate-400">Chọn ít nhất 1 món</span>
+                        <span class="text-[11px] text-slate-400">Chọn ít nhất 1 áo</span>
                     </div>
 
-                    <div class="space-y-3">
-                        <?php if (empty($event['items'])): ?>
-                            <p class="text-xs text-slate-400 italic">Sự kiện chưa có danh mục món hàng cụ thể.</p>
-                        <?php else: ?>
-                            <?php foreach ($event['items'] as $idx => $item): ?>
-                                <div class="flex items-center justify-between p-3.5 border border-slate-200 rounded-2xl hover:border-emerald-300 transition bg-white shadow-2xs">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-9 h-9 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center font-bold text-slate-700 text-xs">
-                                            <?= htmlspecialchars(mb_substr($item['option_name'], 0, 3)) ?>
-                                        </div>
-                                        <div>
-                                            <div class="font-bold text-sm text-slate-900"><?= htmlspecialchars($item['name']) ?> - <?= htmlspecialchars($item['option_name']) ?></div>
-                                            <div class="text-xs text-emerald-600 font-bold mt-0.5"><?= number_format($item['price'], 0, ',', '.') ?> ₫</div>
-                                        </div>
+                    <?php
+                        $adultItems = [];
+                        $kidItems = [];
+
+                        if (!empty($event['items'])) {
+                            foreach ($event['items'] as $item) {
+                                // Kiểm tra xem có phải size trẻ em không
+                                $opt = $item['option_name'];
+                                $isKid = str_contains($item['name'], 'Trẻ Em') || preg_match('/Size\s*(100|110|120|130|140|150)\b/i', $opt);
+                                if ($isKid) {
+                                    $kidItems[] = $item;
+                                } else {
+                                    $adultItems[] = $item;
+                                }
+                            }
+                        }
+                    ?>
+
+                    <!-- Danh sách Size Người Lớn -->
+                    <div class="space-y-2.5">
+                        <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-1">Size Người Lớn (Nam & Nữ)</div>
+                        <?php foreach ($adultItems as $item): ?>
+                            <?php
+                                // Tách tên size (ví dụ: Size XS) và thông số (ví dụ: 40-50kg | 1m50-1m60)
+                                $rawOpt = $item['option_name'];
+                                $sizeLabel = $rawOpt;
+                                $sizeDesc = '';
+                                if (preg_match('/^(Size\s*[A-Z0-9]+)\s*\((.*?)\)$/ui', $rawOpt, $m)) {
+                                    $sizeLabel = $m[1];
+                                    $sizeDesc = $m[2];
+                                }
+                            ?>
+                            <div class="flex items-center justify-between p-3 sm:p-3.5 border border-slate-200 rounded-2xl hover:border-emerald-300 transition bg-white shadow-2xs">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-11 h-11 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 flex items-center justify-center font-black text-xs sm:text-sm flex-shrink-0">
+                                        <?= htmlspecialchars(str_replace('Size ', '', $sizeLabel)) ?>
                                     </div>
-                                    <div class="flex items-center gap-1.5 sm:gap-2">
-                                        <button type="button" onclick="adjustQty(<?= $item['id'] ?>, -1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">-</button>
-                                        <input type="number" id="qty-<?= $item['id'] ?>" data-price="<?= $item['price'] ?>" data-id="<?= $item['id'] ?>" value="0" min="0" readonly class="item-qty-input w-10 text-center font-bold text-sm bg-white border border-slate-200 rounded-xl py-1 focus:outline-none">
-                                        <button type="button" onclick="adjustQty(<?= $item['id'] ?>, 1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">+</button>
+                                    <div>
+                                        <div class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                            <span><?= htmlspecialchars($sizeLabel) ?></span>
+                                            <?php if ($sizeDesc): ?>
+                                                <span class="text-xs text-slate-500 font-normal">• <?= htmlspecialchars($sizeDesc) ?></span>
+                                            <?php endif; ?>
+                                        </div>
+                                        <div class="text-xs text-emerald-600 font-bold mt-0.5"><?= number_format($item['price'], 0, ',', '.') ?> ₫</div>
                                     </div>
                                 </div>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
+                                <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                                    <button type="button" onclick="adjustQty(<?= $item['id'] ?>, -1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">-</button>
+                                    <input type="number" id="qty-<?= $item['id'] ?>" data-price="<?= $item['price'] ?>" data-id="<?= $item['id'] ?>" value="0" min="0" readonly class="item-qty-input w-9 sm:w-10 text-center font-bold text-sm bg-white border border-slate-200 rounded-xl py-1 focus:outline-none">
+                                    <button type="button" onclick="adjustQty(<?= $item['id'] ?>, 1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">+</button>
+                                </div>
+                            </div>
+                        <?php endforeach; ?>
                     </div>
+
+                    <!-- Danh sách Size Trẻ Em (Thu gọn / Accordion) -->
+                    <?php if (!empty($kidItems)): ?>
+                        <div class="pt-2 border-t border-slate-100">
+                            <button type="button" onclick="toggleKidsList()" class="w-full flex items-center justify-between p-3.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-left transition">
+                                <div class="flex items-center gap-2">
+                                    <i class="fa-solid fa-child-reaching text-amber-500"></i>
+                                    <span class="text-xs font-bold text-slate-800">Size Trẻ Em (Bé từ 10kg - 39kg)</span>
+                                    <span class="text-[10px] bg-slate-200 text-slate-600 font-semibold px-2 py-0.5 rounded-full"><?= count($kidItems) ?> size</span>
+                                </div>
+                                <span id="kids-toggle-icon" class="text-xs text-slate-400 font-bold flex items-center gap-1">
+                                    <span id="kids-toggle-text">Bấm để chọn</span>
+                                    <i class="fa-solid fa-chevron-down transition duration-200"></i>
+                                </span>
+                            </button>
+
+                            <div id="kids-size-container" class="hidden mt-2.5 space-y-2.5 pl-1 sm:pl-2">
+                                <?php foreach ($kidItems as $item): ?>
+                                    <?php
+                                        $rawOpt = $item['option_name'];
+                                        $sizeLabel = $rawOpt;
+                                        $sizeDesc = '';
+                                        if (preg_match('/^(Size\s*[A-Z0-9]+)\s*\((.*?)\)$/ui', $rawOpt, $m)) {
+                                            $sizeLabel = $m[1];
+                                            $sizeDesc = $m[2];
+                                        }
+                                    ?>
+                                    <div class="flex items-center justify-between p-3 border border-slate-200 rounded-2xl hover:border-amber-300 transition bg-white shadow-2xs">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 flex items-center justify-center font-black text-xs flex-shrink-0">
+                                                <?= htmlspecialchars(str_replace('Size ', '', $sizeLabel)) ?>
+                                            </div>
+                                            <div>
+                                                <div class="font-bold text-sm text-slate-900 flex items-center gap-1.5">
+                                                    <span><?= htmlspecialchars($sizeLabel) ?></span>
+                                                    <?php if ($sizeDesc): ?>
+                                                        <span class="text-xs text-slate-500 font-normal">• <?= htmlspecialchars($sizeDesc) ?></span>
+                                                    <?php endif; ?>
+                                                </div>
+                                                <div class="text-xs text-amber-600 font-bold mt-0.5"><?= number_format($item['price'], 0, ',', '.') ?> ₫</div>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                                            <button type="button" onclick="adjustQty(<?= $item['id'] ?>, -1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">-</button>
+                                            <input type="number" id="qty-<?= $item['id'] ?>" data-price="<?= $item['price'] ?>" data-id="<?= $item['id'] ?>" value="0" min="0" readonly class="item-qty-input w-9 sm:w-10 text-center font-bold text-sm bg-white border border-slate-200 rounded-xl py-1 focus:outline-none">
+                                            <button type="button" onclick="adjustQty(<?= $item['id'] ?>, 1)" class="w-8 h-8 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 active:scale-95 transition">+</button>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Sticky Footer Total & Submit Bar -->
@@ -297,6 +380,21 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
             });
             document.getElementById('display-total').innerText = formatVND(total);
             return total;
+        }
+
+        function toggleKidsList() {
+            const container = document.getElementById('kids-size-container');
+            const toggleText = document.getElementById('kids-toggle-text');
+            const icon = document.querySelector('#kids-toggle-icon i');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+                toggleText.innerText = 'Thu gọn';
+                icon.className = 'fa-solid fa-chevron-up transition duration-200';
+            } else {
+                container.classList.add('hidden');
+                toggleText.innerText = 'Bấm để chọn';
+                icon.className = 'fa-solid fa-chevron-down transition duration-200';
+            }
         }
 
         function adjustQty(itemId, delta) {

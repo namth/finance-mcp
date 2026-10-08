@@ -183,16 +183,6 @@ class GroupBuy
 
         $this->db->beginTransaction();
         try {
-            $stmt = $this->db->prepare("
-                INSERT INTO group_buy_events (
-                    group_id, creator_id, title, description, image_url, public_token,
-                    bank_bin, bank_account_no, bank_account_name, deadline, status, created_at
-                ) VALUES (
-                    :group_id, :creator_id, :title, :description, :image_url, :public_token,
-                    :bank_bin, :bank_account_no, :bank_account_name, :deadline, 'open', datetime('now')
-                )
-            ");
-
             // Format datetime theo driver
             $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
             $nowSql = $driver === 'sqlite' ? "datetime('now')" : "NOW()";

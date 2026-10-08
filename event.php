@@ -487,6 +487,7 @@ $pageTitle = $event ? htmlspecialchars($event['title']) . " - Gom Mua Chung" : "
                 <?php endif; ?>
             </div>
         <?php endif; ?>
+    <?php endif; ?>
 
     </div>
 

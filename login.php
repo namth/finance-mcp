@@ -1,15 +1,5 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-// Nếu đã đăng nhập thì vào thẳng trang chủ
-if (!empty($_SESSION['user_id'])) {
-    header('Location: index.php');
-    exit;
-}
-
 spl_autoload_register(function ($class) {
     $prefix = 'SimpleFinance\\';
     $baseDir = __DIR__ . '/src/';
@@ -21,14 +11,27 @@ spl_autoload_register(function ($class) {
 });
 
 use SimpleFinance\Models\User;
+use SimpleFinance\Security\AuthSession;
+
+AuthSession::start();
 
 $userModel = null;
 $dbError = null;
 
 try {
     $userModel = new User();
+    // Tự động đăng nhập từ Persistent Remember Cookie nếu có
+    if (empty($_SESSION['user_id'])) {
+        AuthSession::tryAutoLogin($userModel);
+    }
 } catch (\Throwable $e) {
     $dbError = $e->getMessage();
+}
+
+// Nếu đã đăng nhập thì vào thẳng trang chủ
+if (!empty($_SESSION['user_id'])) {
+    header('Location: index.php');
+    exit;
 }
 
 // Nếu không kết nối được CSDL, hiển thị trang hướng dẫn khắc phục thay vì lỗi 500
@@ -192,9 +195,9 @@ if ($targetUserId) {
             }
 
             if ($isAllCorrect) {
-                // Đăng nhập thành công!
-                $_SESSION['user_id'] = $targetUserId;
-                $_SESSION['user'] = $userModel->findById($targetUserId);
+                // Đăng nhập thành công và ghi nhớ phiên đăng nhập lâu dài
+                $loggedUser = $userModel->findById($targetUserId);
+                AuthSession::loginUser($targetUserId, $loggedUser, true);
                 unset($_SESSION['login_target_user_id'], $_SESSION['login_target_user_name'], $_SESSION['login_target_username'], $_SESSION['login_fail_count'], $_SESSION['login_quiz']);
 
                 header('Location: index.php');

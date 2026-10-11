@@ -2,15 +2,6 @@
 
 date_default_timezone_set('Asia/Ho_Chi_Minh');
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
-
-if (empty($_SESSION['user_id'])) {
-    header('Location: login.php');
-    exit;
-}
-
 // Nạp tự động các lớp
 spl_autoload_register(function ($class) {
     $prefix = 'SimpleFinance\\';
@@ -24,6 +15,9 @@ spl_autoload_register(function ($class) {
 
 use SimpleFinance\Models\Group;
 use SimpleFinance\Models\User;
+use SimpleFinance\Security\AuthSession;
+
+AuthSession::start();
 
 try {
     $userModel = new User();
@@ -33,10 +27,19 @@ try {
     exit;
 }
 
+// Nếu session trống, thử tự động khôi phục từ Persistent Remember Cookie
+if (empty($_SESSION['user_id'])) {
+    AuthSession::tryAutoLogin($userModel);
+}
+
+if (empty($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit;
+}
+
 $currentUser = $userModel->findById((int)$_SESSION['user_id']);
 if (!$currentUser) {
-    $_SESSION = [];
-    session_destroy();
+    AuthSession::logout();
     header('Location: login.php');
     exit;
 }

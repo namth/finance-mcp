@@ -105,8 +105,8 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
     <!-- Danh sách Sự Kiện -->
     <?php if (empty($events)): ?>
         <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-2xs">
-            <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-2xl">
-                <i class="fa-solid fa-cart-shopping"></i>
+            <div class="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-3 text-3xl">
+                <i class="ph ph-shopping-cart"></i>
             </div>
             <h3 class="text-base font-bold text-slate-800">Chưa có sự kiện mua chung nào</h3>
             <p class="text-xs text-slate-400 mt-1 max-w-sm mx-auto">Tạo sự kiện đầu tiên để gom đơn mua áo, đồ ăn trưa hoặc quà tặng tập thể cho nhóm.</p>
@@ -185,10 +185,10 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
                     <div class="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-2">
                         <div class="flex items-center gap-1.5">
                             <button type="button" onclick="copyLink('<?= htmlspecialchars($publicUrl) ?>')" class="px-3 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold hover:bg-slate-100 transition flex items-center gap-1.5" title="Sao chép link gửi Zalo/Messenger">
-                                <i class="fa-regular fa-copy text-slate-400"></i> Copy Link
+                                <i class="ph ph-copy text-slate-400 text-sm"></i> Copy Link
                             </button>
                             <button type="button" onclick="deleteEvent(<?= (int)$ev['id'] ?>)" class="p-2 bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-200 rounded-xl text-xs transition" title="Xóa sự kiện này">
-                                <i class="fa-regular fa-trash-can"></i>
+                                <i class="ph ph-trash text-sm"></i>
                             </button>
                         </div>
                         <a href="group_buy_detail.php?id=<?= $ev['id'] ?>" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition flex items-center gap-1">
@@ -211,7 +211,7 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
                 <p class="text-xs text-slate-400">Thiết lập thông tin và danh mục phân loại/size</p>
             </div>
             <button type="button" onclick="closeCreateModal()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100">
-                <i class="fa-solid fa-xmark"></i>
+                <i class="ph ph-x text-base"></i>
             </button>
         </div>
 
@@ -256,17 +256,17 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
                     <div class="flex items-center gap-2 option-row">
                         <input type="text" name="option_name[]" required value="Size S (Dưới 52kg)" placeholder="Tên phân loại / Size" class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                         <input type="number" name="price[]" required value="150000" min="0" placeholder="Đơn giá" class="w-28 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>
+                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="ph ph-trash"></i></button>
                     </div>
                     <div class="flex items-center gap-2 option-row">
                         <input type="text" name="option_name[]" required value="Size M (53kg - 62kg)" placeholder="Tên phân loại / Size" class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                         <input type="number" name="price[]" required value="150000" min="0" placeholder="Đơn giá" class="w-28 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>
+                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="ph ph-trash"></i></button>
                     </div>
                     <div class="flex items-center gap-2 option-row">
                         <input type="text" name="option_name[]" required value="Size L (63kg - 72kg)" placeholder="Tên phân loại / Size" class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                         <input type="number" name="price[]" required value="150000" min="0" placeholder="Đơn giá" class="w-28 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>
+                        <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="ph ph-trash"></i></button>
                     </div>
                 </div>
             </div>
@@ -297,7 +297,7 @@ $events = $groupBuyModel->getEventsByGroup($currentGroupId);
         div.innerHTML = `
             <input type="text" name="option_name[]" required placeholder="Tên phân loại / Size" class="flex-1 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
             <input type="number" name="price[]" required value="0" min="0" placeholder="Đơn giá" class="w-28 px-3 py-2 text-xs bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-            <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="fa-solid fa-trash-can"></i></button>
+            <button type="button" onclick="removeOptionRow(this)" class="p-2 text-slate-400 hover:text-red-500"><i class="ph ph-trash"></i></button>
         `;
         container.appendChild(div);
     }

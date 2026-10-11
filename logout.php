@@ -1,18 +1,18 @@
 <?php
 
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+spl_autoload_register(function ($class) {
+    $prefix = 'SimpleFinance\\';
+    $baseDir = __DIR__ . '/src/';
+    $len = strlen($prefix);
+    if (strncmp($prefix, $class, $len) !== 0) return;
+    $relativeClass = substr($class, $len);
+    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    if (file_exists($file)) require $file;
+});
 
-$_SESSION = [];
-if (ini_get("session.use_cookies")) {
-    $params = session_get_cookie_params();
-    setcookie(session_name(), '', time() - 42000,
-        $params["path"], $params["domain"],
-        $params["secure"], $params["httponly"]
-    );
-}
-session_destroy();
+use SimpleFinance\Security\AuthSession;
+
+AuthSession::logout();
 
 header('Location: login.php');
 exit;

@@ -23,7 +23,10 @@ $currentGroupId = (int)($_SESSION['current_group_id'] ?? 0);
                 }
             }
         }
-    </script>
+    <!-- Phosphor Icons CDN -->
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css"/>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/bold/style.css"/>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <style>
         /* Ngăn iOS Safari tự động phóng to (zoom) khi focus vào input/select */
         @media screen and (max-width: 768px) {

@@ -59,8 +59,8 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 <?php if (!empty($event['image_url'])): ?>
                     <img src="<?= htmlspecialchars($event['image_url']) ?>" alt="Ảnh sản phẩm" class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border border-slate-200 shadow-xs flex-shrink-0">
                 <?php else: ?>
-                    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-2xl font-bold flex-shrink-0">
-                        <i class="fa-solid fa-shirt"></i>
+                    <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center text-3xl font-bold flex-shrink-0">
+                        <i class="ph ph-t-shirt"></i>
                     </div>
                 <?php endif; ?>
 
@@ -72,7 +72,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                             <span class="px-2.5 py-0.5 bg-slate-100 text-slate-700 rounded-full text-xs font-bold">ĐÃ ĐÓNG ĐƠN</span>
                         <?php elseif ($isExpired): ?>
                             <span class="px-2.5 py-0.5 bg-rose-100 text-rose-800 rounded-full text-xs font-bold flex items-center gap-1">
-                                <i class="fa-solid fa-clock-rotate-left"></i> ĐÃ HẾT HẠN
+                                <i class="ph ph-clock-countdown"></i> ĐÃ HẾT HẠN
                             </span>
                         <?php else: ?>
                             <span class="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-xs font-bold">ĐANG NHẬN ĐƠN</span>
@@ -93,24 +93,24 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
             <!-- Actions Bar -->
             <div class="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
                 <button type="button" onclick="copyPublicLink('<?= htmlspecialchars($publicUrl) ?>')" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-2xs">
-                    <i class="fa-regular fa-copy"></i> Sao chép Link Đặt
+                    <i class="ph ph-copy text-sm"></i> Sao chép Link Đặt
                 </button>
                 <a href="event.php?token=<?= htmlspecialchars($event['public_token']) ?>" target="_blank" class="px-3.5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-2xs">
-                    <i class="fa-solid fa-arrow-up-right-from-square"></i> Mở Trang Đăng Ký
+                    <i class="ph ph-arrow-square-out text-sm"></i> Mở Trang Đăng Ký
                 </a>
                 <button type="button" onclick="openEditDeadlineModal()" class="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-2xs" title="Chỉnh sửa thời gian hết hạn">
-                    <i class="fa-regular fa-clock text-amber-600"></i> Đổi Hạn Chót
+                    <i class="ph ph-clock text-amber-600 text-sm"></i> Đổi Hạn Chót
                 </button>
                 <?php if ($event['status'] !== 'converted'): ?>
                     <button type="button" onclick="convertToTransaction(<?= $event['id'] ?>)" class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black rounded-2xl shadow-lg shadow-emerald-600/30 transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-file-invoice-dollar"></i> Chốt Hóa Đơn
+                        <i class="ph ph-receipt text-sm"></i> Chốt Hóa Đơn
                     </button>
                     <button type="button" onclick="deleteEvent(<?= $event['id'] ?>)" class="px-3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold rounded-2xl transition flex items-center gap-1.5" title="Xóa sự kiện này">
-                        <i class="fa-regular fa-trash-can"></i> Xóa
+                        <i class="ph ph-trash text-sm"></i> Xóa
                     </button>
                 <?php else: ?>
                     <a href="transaction_detail.php?id=<?= $event['transaction_id'] ?>" class="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-black rounded-2xl shadow-md transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-receipt"></i> Xem Giao Dịch #<?= $event['transaction_id'] ?>
+                        <i class="ph ph-receipt text-sm"></i> Xem Giao Dịch #<?= $event['transaction_id'] ?>
                     </a>
                 <?php endif; ?>
             </div>
@@ -160,7 +160,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                 <p class="text-xs text-slate-400">Tick trực tiếp vào ô để xác nhận thu tiền hoặc đánh dấu khi đã phát hàng cho người nhận</p>
             </div>
             <button type="button" onclick="openAddOrderModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-plus"></i> Thêm Đơn Đặt
+                <i class="ph-bold ph-plus text-sm"></i> Thêm Đơn Đặt
             </button>
         </div>
 
@@ -251,15 +251,15 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                                     <div class="flex items-center justify-center gap-1">
                                         <button type="button" 
                                                 onclick='openEditOrderModal(<?= json_encode($regPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>)' 
-                                                class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition" 
+                                                class="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition" 
                                                 title="Chỉnh sửa đơn hàng này">
-                                            <i class="fa-regular fa-pen-to-square"></i>
+                                            <i class="ph-bold ph-pencil-simple text-base"></i>
                                         </button>
                                         <button type="button" 
                                                 onclick="deleteRegistration(<?= $r['id'] ?>, '<?= htmlspecialchars(addslashes($r['participant_name'])) ?>')" 
                                                 class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition" 
                                                 title="Xóa đơn đăng ký này">
-                                            <i class="fa-regular fa-trash-can"></i>
+                                            <i class="ph-bold ph-trash text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -280,7 +280,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                     <p class="text-xs text-slate-400">Gia hạn hoặc rút ngắn thời gian nhận đăng ký</p>
                 </div>
                 <button type="button" onclick="closeEditDeadlineModal()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="ph-bold ph-x text-base"></i>
                 </button>
             </div>
 
@@ -308,8 +308,8 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
         <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
             <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
-                        <i class="fa-solid fa-cart-shopping"></i>
+                    <div class="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-lg font-bold">
+                        <i class="ph-bold ph-shopping-cart"></i>
                     </div>
                     <div>
                         <h3 id="order-modal-title" class="text-base font-black text-slate-900">Thêm Đơn Đặt Hàng Mới</h3>
@@ -317,7 +317,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                     </div>
                 </div>
                 <button type="button" onclick="closeOrderModal()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100">
-                    <i class="fa-solid fa-xmark"></i>
+                    <i class="ph-bold ph-x text-base"></i>
                 </button>
             </div>
 
@@ -402,7 +402,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                         Hủy bỏ
                     </button>
                     <button type="submit" id="btn-submit-admin-order" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
-                        <i class="fa-solid fa-floppy-disk"></i> Lưu Đơn Hàng
+                        <i class="ph-bold ph-floppy-disk text-sm"></i> Lưu Đơn Hàng
                     </button>
                 </div>
             </form>
@@ -520,7 +520,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
 
         const btn = document.getElementById('btn-submit-admin-order');
         const origText = btn.innerHTML;
-        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...`;
+        btn.innerHTML = `<i class="ph-bold ph-spinner animate-spin"></i> Đang lưu...`;
         btn.disabled = true;
 
         const formData = new FormData();

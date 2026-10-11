@@ -306,5 +306,53 @@ try {
 assert($blocked === true, "Đăng ký sự kiện quá hạn phải bị từ chối với thông báo hết hạn");
 echo "✅ PASS (Chặn đăng ký thành công khi sự kiện đã quá hạn chót)\n";
 
-echo "\n🎉 TẤT CẢ 12/12 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
+// TEST 12: Admin thêm đơn mới trực tiếp trên trang quản trị
+echo "[12/13] Kiểm thử Admin thêm đơn đặt hàng mới (adminSaveRegistration - Create)... ";
+$adminNewOrder = $groupBuy->adminSaveRegistration($event3['id'], [
+    'participant_name'  => 'Chú Tuấn',
+    'participant_phone' => '0988888888',
+    'note'              => 'Đặt hộ phòng kỹ thuật',
+    'items'             => [
+        ['item_id' => $event3['items'][0]['id'], 'quantity' => 2] // 50k x 2 = 100k
+    ],
+    'is_paid'           => 1,
+    'is_delivered'      => 0,
+]);
+assert($adminNewOrder['success'] === true, "Admin thêm đơn phải thành công");
+assert($adminNewOrder['is_edit'] === false, "is_edit phải là false khi thêm mới");
+assert($adminNewOrder['total_amount'] == 100000, "Tổng tiền phải là 100.000 ₫");
+
+$adminReg = $groupBuy->getRegistrationById($adminNewOrder['registration_id']);
+assert($adminReg['participant_name'] === 'Chú Tuấn', "Tên người đặt phải là 'Chú Tuấn'");
+assert((int)$adminReg['is_paid'] === 1, "is_paid phải là 1");
+assert((int)$adminReg['is_delivered'] === 0, "is_delivered phải là 0");
+assert(count($adminReg['items']) === 1, "Phải có đúng 1 phân loại món");
+assert((int)$adminReg['items'][0]['quantity'] === 2, "Số lượng món phải là 2");
+echo "✅ PASS (Admin thêm đơn mới thành công: #{$adminNewOrder['registration_id']} - 100.000 ₫)\n";
+
+// TEST 13: Admin chỉnh sửa đơn hàng đã có
+echo "[13/13] Kiểm thử Admin chỉnh sửa đơn hàng đã có (adminSaveRegistration - Update)... ";
+$adminEditOrder = $groupBuy->adminSaveRegistration($event3['id'], [
+    'participant_name'  => 'Chú Tuấn (Bàn 4)',
+    'participant_phone' => '0988888888',
+    'note'              => 'Lấy 3 cái thay vì 2 cái',
+    'items'             => [
+        ['item_id' => $event3['items'][0]['id'], 'quantity' => 3] // 50k x 3 = 150k
+    ],
+    'is_paid'           => 1,
+    'is_delivered'      => 1, // Đổi thành đã giao hàng
+], $adminNewOrder['registration_id']);
+
+assert($adminEditOrder['success'] === true, "Admin sửa đơn phải thành công");
+assert($adminEditOrder['is_edit'] === true, "is_edit phải là true khi chỉnh sửa");
+assert($adminEditOrder['total_amount'] == 150000, "Tổng tiền mới phải là 150.000 ₫");
+
+$editedReg = $groupBuy->getRegistrationById($adminNewOrder['registration_id']);
+assert($editedReg['participant_name'] === 'Chú Tuấn (Bàn 4)', "Tên người đặt phải được cập nhật");
+assert((int)$editedReg['is_delivered'] === 1, "is_delivered phải chuyển thành 1");
+assert((float)$editedReg['total_amount'] == 150000, "total_amount phải cập nhật lên 150.000 ₫");
+assert((int)$editedReg['items'][0]['quantity'] === 3, "Số lượng món trong items phải cập nhật thành 3");
+echo "✅ PASS (Admin sửa đơn thành công: Cập nhật tên, số lượng 3 món, tổng tiền 150.000 ₫ & đã nhận hàng)\n";
+
+echo "\n🎉 TẤT CẢ 14/14 CA KIỂM THỬ ĐỀU ĐẠT CHUẨN 100% THÀNH CÔNG!\n";
 echo "========================================================\n";

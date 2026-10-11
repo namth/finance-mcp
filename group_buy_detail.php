@@ -154,16 +154,19 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
 
     <!-- Bảng Danh Sách Người Đăng Ký & Nút Tick Đã Thu Tiền / Phát Hàng -->
     <div class="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-2xs">
-        <div class="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+        <div class="p-4 sm:p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
             <div>
                 <h2 class="text-sm sm:text-base font-bold text-slate-900">Danh sách đơn đăng ký (<?= count($registrations) ?>)</h2>
                 <p class="text-xs text-slate-400">Tick trực tiếp vào ô để xác nhận thu tiền hoặc đánh dấu khi đã phát hàng cho người nhận</p>
             </div>
+            <button type="button" onclick="openAddOrderModal()" class="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold rounded-2xl transition flex items-center gap-1.5 shadow-sm">
+                <i class="fa-solid fa-plus"></i> Thêm Đơn Đặt
+            </button>
         </div>
 
         <?php if (empty($registrations)): ?>
             <div class="p-12 text-center text-slate-400 text-xs">
-                Chưa có ai gửi đăng ký cho sự kiện này. Hãy sao chép liên kết bên trên gửi vào nhóm Zalo/Telegram nhé!
+                Chưa có ai gửi đăng ký cho sự kiện này. Hãy sao chép liên kết bên trên gửi vào nhóm Zalo/Telegram hoặc bấm "Thêm Đơn Đặt" để tạo đơn trực tiếp nhé!
             </div>
         <?php else: ?>
             <div class="overflow-x-auto">
@@ -176,7 +179,7 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                             <th class="py-3 px-4 text-center">Trạng thái thanh toán</th>
                             <th class="py-3 px-4 text-center">Phát / Nhận hàng</th>
                             <th class="py-3 px-4 text-right">Thời gian</th>
-                            <th class="py-3 px-3 text-center w-12">Xóa</th>
+                            <th class="py-3 px-3 text-center w-20">Thao tác</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100">
@@ -185,6 +188,21 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                                 $isPaid = (int)$r['is_paid'] === 1;
                                 $isNotified = (int)$r['is_notified_paid'] === 1;
                                 $isDelivered = (int)($r['is_delivered'] ?? 0) === 1;
+
+                                $regPayload = [
+                                    'id'                => (int)$r['id'],
+                                    'participant_name'  => $r['participant_name'],
+                                    'participant_phone' => $r['participant_phone'] ?? '',
+                                    'note'              => $r['note'] ?? '',
+                                    'is_paid'           => (int)$r['is_paid'],
+                                    'is_delivered'      => (int)($r['is_delivered'] ?? 0),
+                                    'items'             => array_map(function($it) {
+                                        return [
+                                            'item_id'  => (int)$it['item_id'],
+                                            'quantity' => (int)$it['quantity']
+                                        ];
+                                    }, $r['items'] ?? [])
+                                ];
                             ?>
                             <tr class="hover:bg-slate-50/50 transition <?= $isPaid ? '' : ($isNotified ? 'bg-amber-50/30' : '') ?>">
                                 <td class="py-3.5 px-4">
@@ -229,13 +247,21 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
                                 <td class="py-3.5 px-4 text-right text-slate-400 text-[11px]">
                                     <?= date('H:i d/m', strtotime($r['created_at'])) ?>
                                 </td>
-                                <td class="py-3.5 px-3 text-center">
-                                    <button type="button" 
-                                            onclick="deleteRegistration(<?= $r['id'] ?>, '<?= htmlspecialchars(addslashes($r['participant_name'])) ?>')" 
-                                            class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition" 
-                                            title="Xóa đơn đăng ký nhầm này">
-                                        <i class="fa-regular fa-trash-can"></i>
-                                    </button>
+                                <td class="py-3.5 px-3 text-center whitespace-nowrap">
+                                    <div class="flex items-center justify-center gap-1">
+                                        <button type="button" 
+                                                onclick='openEditOrderModal(<?= json_encode($regPayload, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE) ?>)' 
+                                                class="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition" 
+                                                title="Chỉnh sửa đơn hàng này">
+                                            <i class="fa-regular fa-pen-to-square"></i>
+                                        </button>
+                                        <button type="button" 
+                                                onclick="deleteRegistration(<?= $r['id'] ?>, '<?= htmlspecialchars(addslashes($r['participant_name'])) ?>')" 
+                                                class="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition" 
+                                                title="Xóa đơn đăng ký này">
+                                            <i class="fa-regular fa-trash-can"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -277,9 +303,260 @@ $publicUrl = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" :
         </div>
     </div>
 
+    <!-- Modal Thêm / Chỉnh Sửa Đơn Đặt Hàng -->
+    <div id="modal-order-form" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-3 sm:p-4">
+        <div class="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-9 h-9 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm font-bold">
+                        <i class="fa-solid fa-cart-shopping"></i>
+                    </div>
+                    <div>
+                        <h3 id="order-modal-title" class="text-base font-black text-slate-900">Thêm Đơn Đặt Hàng Mới</h3>
+                        <p class="text-xs text-slate-400">Tạo hoặc điều chỉnh đơn đặt cho thành viên</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeOrderModal()" class="p-2 rounded-full text-slate-400 hover:bg-slate-100">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-order" onsubmit="submitAdminOrder(event, <?= (int)$event['id'] ?>)" class="space-y-4 overflow-y-auto pr-1 flex-1">
+                <input type="hidden" id="order-reg-id" value="">
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1">Họ và tên người đặt <span class="text-rose-500">*</span></label>
+                    <input type="text" id="order-name" required placeholder="Ví dụ: Nam Trần, Cô giáo Mai..." class="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Số điện thoại / Zalo</label>
+                        <input type="text" id="order-phone" placeholder="0912345678 (tùy chọn)" class="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1">Ghi chú</label>
+                        <input type="text" id="order-note" placeholder="Form rộng, bàn 3..." class="w-full px-3.5 py-2.5 text-xs bg-white border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Danh mục sản phẩm / size -->
+                <div class="pt-2">
+                    <label class="block text-xs font-bold text-slate-700 mb-2">Chọn sản phẩm / Phân loại size <span class="text-rose-500">*</span></label>
+                    <div class="space-y-2 border border-slate-200 rounded-2xl p-3 bg-slate-50/50 max-h-56 overflow-y-auto">
+                        <?php if (empty($event['items'])): ?>
+                            <p class="text-xs text-slate-400 text-center py-2">Sự kiện chưa có danh mục sản phẩm.</p>
+                        <?php else: ?>
+                            <?php foreach ($event['items'] as $it): ?>
+                                <div class="flex items-center justify-between p-2 bg-white rounded-xl border border-slate-100 hover:border-slate-200 transition text-xs gap-2">
+                                    <div class="flex-1 min-w-0">
+                                        <div class="font-bold text-slate-800 truncate" title="<?= htmlspecialchars($it['option_name']) ?>">
+                                            <?= htmlspecialchars($it['option_name']) ?>
+                                        </div>
+                                        <div class="text-[11px] text-emerald-600 font-semibold">
+                                            <?= number_format($it['price'], 0, ',', '.') ?> ₫
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 flex-shrink-0">
+                                        <button type="button" onclick="changeItemQty(this, -1)" class="w-7 h-7 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold flex items-center justify-center transition active:scale-95 text-xs">
+                                            -
+                                        </button>
+                                        <input type="number" 
+                                               min="0" 
+                                               value="0" 
+                                               data-id="<?= (int)$it['id'] ?>" 
+                                               data-price="<?= (float)$it['price'] ?>" 
+                                               onchange="recalcAdminOrderTotal()" 
+                                               oninput="recalcAdminOrderTotal()" 
+                                               class="admin-item-qty w-12 text-center text-xs font-bold bg-white border border-slate-200 rounded-lg py-1 focus:ring-1 focus:ring-emerald-500 focus:outline-none">
+                                        <button type="button" onclick="changeItemQty(this, 1)" class="w-7 h-7 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold flex items-center justify-center transition active:scale-95 text-xs">
+                                            +
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
+                    </div>
+                </div>
+
+                <!-- Tạm tính -->
+                <div class="flex items-center justify-between p-3 bg-emerald-50/60 rounded-2xl border border-emerald-100 text-xs">
+                    <span class="text-slate-600">Đã chọn: <strong id="admin-modal-total-qty" class="text-slate-900 font-bold">0</strong> món</span>
+                    <span class="text-slate-600">Tổng tiền: <strong id="admin-modal-total-amount" class="text-emerald-700 font-black text-sm">0 ₫</strong></span>
+                </div>
+
+                <!-- Trạng thái -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <label class="flex items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer text-xs">
+                        <input type="checkbox" id="order-is-paid" class="w-4 h-4 rounded text-emerald-600 focus:ring-0">
+                        <span class="font-bold text-slate-700">Đã thu tiền</span>
+                    </label>
+                    <label class="flex items-center gap-2 p-3 bg-slate-50 rounded-2xl border border-slate-200 cursor-pointer text-xs">
+                        <input type="checkbox" id="order-is-delivered" class="w-4 h-4 rounded text-blue-600 focus:ring-0">
+                        <span class="font-bold text-slate-700">Đã phát / nhận hàng</span>
+                    </label>
+                </div>
+
+                <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2 flex-shrink-0">
+                    <button type="button" onclick="closeOrderModal()" class="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-semibold transition">
+                        Hủy bỏ
+                    </button>
+                    <button type="submit" id="btn-submit-admin-order" class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-floppy-disk"></i> Lưu Đơn Hàng
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
 </div>
 
 <script>
+    function openAddOrderModal() {
+        document.getElementById('order-modal-title').innerText = "Thêm Đơn Đặt Hàng Mới";
+        document.getElementById('order-reg-id').value = "";
+        document.getElementById('order-name').value = "";
+        document.getElementById('order-phone').value = "";
+        document.getElementById('order-note').value = "";
+        document.getElementById('order-is-paid').checked = false;
+        document.getElementById('order-is-delivered').checked = false;
+
+        document.querySelectorAll('.admin-item-qty').forEach(inp => {
+            inp.value = 0;
+        });
+
+        recalcAdminOrderTotal();
+        document.getElementById('modal-order-form').classList.remove('hidden');
+        setTimeout(() => document.getElementById('order-name').focus(), 100);
+    }
+
+    function openEditOrderModal(regData) {
+        document.getElementById('order-modal-title').innerText = `Chỉnh Sửa Đơn Hàng #${regData.id}`;
+        document.getElementById('order-reg-id').value = regData.id;
+        document.getElementById('order-name').value = regData.participant_name || '';
+        document.getElementById('order-phone').value = regData.participant_phone || '';
+        document.getElementById('order-note').value = regData.note || '';
+        document.getElementById('order-is-paid').checked = (parseInt(regData.is_paid, 10) === 1);
+        document.getElementById('order-is-delivered').checked = (parseInt(regData.is_delivered, 10) === 1);
+
+        // Reset tất cả về 0 trước
+        document.querySelectorAll('.admin-item-qty').forEach(inp => {
+            inp.value = 0;
+        });
+
+        // Điền số lượng các items đã chọn
+        if (Array.isArray(regData.items)) {
+            regData.items.forEach(it => {
+                const inp = document.querySelector(`.admin-item-qty[data-id="${it.item_id}"]`);
+                if (inp) {
+                    inp.value = it.quantity;
+                }
+            });
+        }
+
+        recalcAdminOrderTotal();
+        document.getElementById('modal-order-form').classList.remove('hidden');
+        setTimeout(() => document.getElementById('order-name').focus(), 100);
+    }
+
+    function closeOrderModal() {
+        document.getElementById('modal-order-form').classList.add('hidden');
+    }
+
+    function changeItemQty(btn, delta) {
+        const row = btn.parentElement;
+        const inp = row.querySelector('.admin-item-qty');
+        if (!inp) return;
+        let cur = parseInt(inp.value || '0', 10);
+        cur = Math.max(0, cur + delta);
+        inp.value = cur;
+        recalcAdminOrderTotal();
+    }
+
+    function recalcAdminOrderTotal() {
+        let totalQty = 0;
+        let totalAmt = 0;
+        document.querySelectorAll('.admin-item-qty').forEach(inp => {
+            const qty = parseInt(inp.value || '0', 10);
+            const price = parseFloat(inp.getAttribute('data-price') || '0');
+            if (qty > 0) {
+                totalQty += qty;
+                totalAmt += (qty * price);
+            }
+        });
+        document.getElementById('admin-modal-total-qty').innerText = totalQty;
+        document.getElementById('admin-modal-total-amount').innerText = new Intl.NumberFormat('vi-VN').format(totalAmt) + ' ₫';
+    }
+
+    function submitAdminOrder(event, eventId) {
+        event.preventDefault();
+
+        const regId = document.getElementById('order-reg-id').value;
+        const name = document.getElementById('order-name').value.trim();
+        const phone = document.getElementById('order-phone').value.trim();
+        const note = document.getElementById('order-note').value.trim();
+        const isPaid = document.getElementById('order-is-paid').checked ? 1 : 0;
+        const isDelivered = document.getElementById('order-is-delivered').checked ? 1 : 0;
+
+        if (!name) {
+            alert('Vui lòng nhập họ và tên người đặt.');
+            document.getElementById('order-name').focus();
+            return;
+        }
+
+        const items = [];
+        document.querySelectorAll('.admin-item-qty').forEach(inp => {
+            const qty = parseInt(inp.value || '0', 10);
+            const itemId = parseInt(inp.getAttribute('data-id') || '0', 10);
+            if (qty > 0 && itemId > 0) {
+                items.push({ item_id: itemId, quantity: qty });
+            }
+        });
+
+        if (items.length === 0) {
+            alert('Vui lòng chọn ít nhất 1 sản phẩm/kích cỡ với số lượng lớn hơn 0.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-submit-admin-order');
+        const origText = btn.innerHTML;
+        btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Đang lưu...`;
+        btn.disabled = true;
+
+        const formData = new FormData();
+        formData.append('action', 'group_buy_admin_save_order');
+        formData.append('event_id', eventId);
+        if (regId) {
+            formData.append('registration_id', regId);
+        }
+        formData.append('participant_name', name);
+        formData.append('participant_phone', phone);
+        formData.append('note', note);
+        formData.append('is_paid', isPaid);
+        formData.append('is_delivered', isDelivered);
+        formData.append('items', JSON.stringify(items));
+
+        fetch('ajax_action.php', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert(data.message || 'Đã lưu đơn đặt hàng thành công!');
+                location.reload();
+            } else {
+                btn.innerHTML = origText;
+                btn.disabled = false;
+                alert(data.message || 'Lỗi khi lưu đơn hàng.');
+            }
+        })
+        .catch(err => {
+            btn.innerHTML = origText;
+            btn.disabled = false;
+            alert('Lỗi kết nối: ' + err.message);
+        });
+    }
     function copyPublicLink(url) {
         navigator.clipboard?.writeText(url);
         alert('Đã sao chép link đặt hàng công khai:\n' + url);

@@ -856,6 +856,211 @@ class GroupBuy
     }
 
     /**
+     * Lấy chi tiết một đơn đăng ký kèm các món/size đã chọn
+     */
+    public function getRegistrationById(int $registrationId): ?array
+    {
+        $stmt = $this->db->prepare("SELECT * FROM group_buy_registrations WHERE id = :id");
+        $stmt->execute([':id' => $registrationId]);
+        $reg = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$reg) return null;
+
+        $itemStmt = $this->db->prepare("
+            SELECT ri.*, i.name as item_name, i.option_name, i.price as current_item_price
+            FROM group_buy_registration_items ri
+            JOIN group_buy_items i ON ri.item_id = i.id
+            WHERE ri.registration_id = :reg_id
+        ");
+        $itemStmt->execute([':reg_id' => $registrationId]);
+        $reg['items'] = $itemStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $reg;
+    }
+
+    /**
+     * Admin tạo mới hoặc cập nhật thông tin đơn hàng
+     */
+    public function adminSaveRegistration(int $eventId, array $data, ?int $registrationId = null): array
+    {
+        $event = $this->getEventById($eventId);
+        if (!$event) {
+            throw new InvalidArgumentException("Không tìm thấy sự kiện #{$eventId}.");
+        }
+
+        $participantName = trim((string)($data['participant_name'] ?? ''));
+        if (empty($participantName)) {
+            throw new InvalidArgumentException("Vui lòng nhập họ và tên người tham gia.");
+        }
+
+        $participantPhone = trim((string)($data['participant_phone'] ?? ''));
+        $note = trim((string)($data['note'] ?? ''));
+
+        // Validate danh mục món
+        $itemsMap = [];
+        foreach ($event['items'] as $it) {
+            $itemsMap[(int)$it['id']] = $it;
+        }
+
+        $rawItems = $data['items'] ?? [];
+        if (!is_array($rawItems)) {
+            $rawItems = [];
+        }
+
+        $totalAmount = 0.0;
+        $orderLines = [];
+        foreach ($rawItems as $ri) {
+            $itemId = (int)($ri['item_id'] ?? 0);
+            $qty = (int)($ri['quantity'] ?? 0);
+
+            if ($qty <= 0) continue;
+            if (!isset($itemsMap[$itemId])) {
+                throw new InvalidArgumentException("Món hàng ID {$itemId} không thuộc sự kiện này.");
+            }
+
+            $itemData = $itemsMap[$itemId];
+            $unitPrice = (float)$itemData['price'];
+            $subtotal = round($unitPrice * $qty, 2);
+            $totalAmount += $subtotal;
+
+            $orderLines[] = [
+                'item_id'    => $itemId,
+                'quantity'   => $qty,
+                'unit_price' => $unitPrice,
+                'subtotal'   => $subtotal,
+            ];
+        }
+
+        if (empty($orderLines)) {
+            throw new InvalidArgumentException("Vui lòng chọn ít nhất một sản phẩm hoặc kích cỡ với số lượng lớn hơn 0.");
+        }
+
+        $isPaid = !empty($data['is_paid']) ? 1 : 0;
+        $paidAt = $isPaid ? ($data['paid_at'] ?? date('Y-m-d H:i:s')) : null;
+        $isDelivered = !empty($data['is_delivered']) ? 1 : 0;
+        $deliveredAt = $isDelivered ? ($data['delivered_at'] ?? date('Y-m-d H:i:s')) : null;
+
+        $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $nowSql = $driver === 'sqlite' ? "datetime('now')" : "NOW()";
+
+        $this->db->beginTransaction();
+        try {
+            if ($registrationId && $registrationId > 0) {
+                // SỬA ĐƠN
+                $checkStmt = $this->db->prepare("SELECT id, is_paid, is_delivered FROM group_buy_registrations WHERE id = :id AND event_id = :event_id");
+                $checkStmt->execute([':id' => $registrationId, ':event_id' => $eventId]);
+                $existing = $checkStmt->fetch(PDO::FETCH_ASSOC);
+                if (!$existing) {
+                    throw new InvalidArgumentException("Không tìm thấy đơn đăng ký #{$registrationId} thuộc sự kiện này.");
+                }
+
+                $updStmt = $this->db->prepare("
+                    UPDATE group_buy_registrations
+                    SET participant_name = :name,
+                        participant_phone = :phone,
+                        note = :note,
+                        total_amount = :total_amount,
+                        is_paid = :is_paid,
+                        paid_at = :paid_at,
+                        is_delivered = :is_delivered,
+                        delivered_at = :delivered_at
+                    WHERE id = :id
+                ");
+                $updStmt->execute([
+                    ':name'         => $participantName,
+                    ':phone'        => $participantPhone ?: null,
+                    ':note'         => $note ?: null,
+                    ':total_amount' => $totalAmount,
+                    ':is_paid'      => $isPaid,
+                    ':paid_at'      => $paidAt,
+                    ':is_delivered' => $isDelivered,
+                    ':delivered_at' => $deliveredAt,
+                    ':id'           => $registrationId,
+                ]);
+
+                // Xóa item cũ và insert lại item mới
+                $delItems = $this->db->prepare("DELETE FROM group_buy_registration_items WHERE registration_id = :reg_id");
+                $delItems->execute([':reg_id' => $registrationId]);
+
+                $itemStmt = $this->db->prepare("
+                    INSERT INTO group_buy_registration_items (
+                        registration_id, item_id, quantity, unit_price, subtotal
+                    ) VALUES (
+                        :registration_id, :item_id, :quantity, :unit_price, :subtotal
+                    )
+                ");
+                foreach ($orderLines as $ol) {
+                    $itemStmt->execute([
+                        ':registration_id' => $registrationId,
+                        ':item_id'         => $ol['item_id'],
+                        ':quantity'        => $ol['quantity'],
+                        ':unit_price'      => $ol['unit_price'],
+                        ':subtotal'        => $ol['subtotal'],
+                    ]);
+                }
+
+                $targetId = $registrationId;
+            } else {
+                // THÊM ĐƠN MỚI
+                $regToken = bin2hex(random_bytes(16));
+                $insStmt = $this->db->prepare("
+                    INSERT INTO group_buy_registrations (
+                        event_id, participant_name, participant_phone, note, total_amount,
+                        is_notified_paid, is_paid, paid_at, is_delivered, delivered_at, reg_token, created_at
+                    ) VALUES (
+                        :event_id, :name, :phone, :note, :total_amount,
+                        0, :is_paid, :paid_at, :is_delivered, :delivered_at, :reg_token, {$nowSql}
+                    )
+                ");
+                $insStmt->execute([
+                    ':event_id'     => $eventId,
+                    ':name'         => $participantName,
+                    ':phone'        => $participantPhone ?: null,
+                    ':note'         => $note ?: null,
+                    ':total_amount' => $totalAmount,
+                    ':is_paid'      => $isPaid,
+                    ':paid_at'      => $paidAt,
+                    ':is_delivered' => $isDelivered,
+                    ':delivered_at' => $deliveredAt,
+                    ':reg_token'    => $regToken,
+                ]);
+
+                $targetId = (int)$this->db->lastInsertId();
+
+                $itemStmt = $this->db->prepare("
+                    INSERT INTO group_buy_registration_items (
+                        registration_id, item_id, quantity, unit_price, subtotal
+                    ) VALUES (
+                        :registration_id, :item_id, :quantity, :unit_price, :subtotal
+                    )
+                ");
+                foreach ($orderLines as $ol) {
+                    $itemStmt->execute([
+                        ':registration_id' => $targetId,
+                        ':item_id'         => $ol['item_id'],
+                        ':quantity'        => $ol['quantity'],
+                        ':unit_price'      => $ol['unit_price'],
+                        ':subtotal'        => $ol['subtotal'],
+                    ]);
+                }
+            }
+
+            $this->db->commit();
+
+            return [
+                'success'         => true,
+                'registration_id' => $targetId,
+                'is_edit'         => ($registrationId && $registrationId > 0),
+                'total_amount'    => $totalAmount,
+                'participant_name'=> $participantName,
+                'message'         => ($registrationId && $registrationId > 0) ? "Đã cập nhật đơn hàng của {$participantName} thành công!" : "Đã thêm đơn hàng mới cho {$participantName} thành công!",
+            ];
+        } catch (\Throwable $e) {
+            $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
      * Xóa sự kiện mua chung
      */
     public function deleteEvent(int $eventId): bool

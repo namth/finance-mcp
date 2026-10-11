@@ -205,6 +205,76 @@ try {
             exit;
 
         // ==========================================
+        // 4e. ADMIN: THÊM HOẶC SỬA ĐƠN ĐĂNG KÝ
+        // ==========================================
+        case 'group_buy_admin_save_order':
+            $eventId = (int)($_POST['event_id'] ?? 0);
+            if ($eventId <= 0) {
+                throw new \InvalidArgumentException("ID sự kiện không hợp lệ.");
+            }
+
+            // Kiểm tra sự kiện thuộc nhóm của user
+            $event = $groupBuyModel->getEventById($eventId);
+            if (!$event || (int)$event['group_id'] !== $currentGroupId) {
+                throw new \InvalidArgumentException("Sự kiện không tồn tại hoặc không thuộc quyền quản lý của bạn.");
+            }
+
+            $regId = !empty($_POST['registration_id']) ? (int)$_POST['registration_id'] : null;
+            $name = trim((string)($_POST['participant_name'] ?? ''));
+            $phone = trim((string)($_POST['participant_phone'] ?? ''));
+            $note = trim((string)($_POST['note'] ?? ''));
+            $isPaid = isset($_POST['is_paid']) ? (int)$_POST['is_paid'] : 0;
+            $isDelivered = isset($_POST['is_delivered']) ? (int)$_POST['is_delivered'] : 0;
+
+            $itemsRaw = $_POST['items'] ?? '[]';
+            $items = is_array($itemsRaw) ? $itemsRaw : json_decode($itemsRaw, true);
+            if (!is_array($items)) {
+                $items = [];
+            }
+
+            $saveResult = $groupBuyModel->adminSaveRegistration($eventId, [
+                'participant_name'  => $name,
+                'participant_phone' => $phone,
+                'note'              => $note,
+                'items'             => $items,
+                'is_paid'           => $isPaid,
+                'is_delivered'      => $isDelivered,
+            ], $regId);
+
+            echo json_encode([
+                'success' => true,
+                'message' => $saveResult['message'],
+                'data'    => $saveResult,
+            ]);
+            exit;
+
+        // ==========================================
+        // 4f. ADMIN: LẤY CHI TIẾT 1 ĐƠN ĐĂNG KÝ
+        // ==========================================
+        case 'group_buy_get_registration':
+            $regId = (int)($_POST['registration_id'] ?? $_GET['registration_id'] ?? 0);
+            if ($regId <= 0) {
+                throw new \InvalidArgumentException("ID đơn đăng ký không hợp lệ.");
+            }
+
+            $regData = $groupBuyModel->getRegistrationById($regId);
+            if (!$regData) {
+                throw new \InvalidArgumentException("Không tìm thấy đơn đăng ký #{$regId}.");
+            }
+
+            // Kiểm tra bảo mật
+            $event = $groupBuyModel->getEventById((int)$regData['event_id']);
+            if (!$event || (int)$event['group_id'] !== $currentGroupId) {
+                throw new \InvalidArgumentException("Bạn không có quyền truy cập đơn hàng này.");
+            }
+
+            echo json_encode([
+                'success' => true,
+                'data'    => $regData,
+            ]);
+            exit;
+
+        // ==========================================
         // 5. CÁC HÀNH ĐỘNG CŨ (PLACE, PRODUCT, TRANSACTION)
         // ==========================================
         case 'quick_place_create':
